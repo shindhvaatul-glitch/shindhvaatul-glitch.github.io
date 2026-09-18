@@ -1,0 +1,1992 @@
+<!DOCTYPE html>
+<html lang="hi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Aero Trigger Arena — Esports Tournament & Wallet</title>
+  <meta name="description" content="Production esports tournament and wallet platform with Google Authentication, real-time Firestore synchronization, and tournament management.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Rajdhani:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { rajdhani: ['Rajdhani', 'sans-serif'], sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: { gold: '#FFB800', orange: '#FF5500', dark: '#070911', panel: '#0F1524', card: '#151D30', border: '#222E47', cyan: '#00F0FF', neonGreen: '#10B981' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body { background-color: #070911; color: #F1F5F9; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    .gold-gradient { background: linear-gradient(135deg, #FFB800 0%, #FF5500 100%); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .smooth-mobile-scroll { overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; overscroll-behavior-y: contain; }
+    #ataStartupSplash { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: #030408; overflow: hidden; transition: opacity .6s ease, visibility .6s ease; }
+    #ataStartupSplash.ata-hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    .ata-splash-inner { position: relative; z-index: 2; width: min(88vw, 440px); text-align: center; }
+    .ata-splash-logo { width: min(48vw, 180px); height: min(48vw, 180px); margin: 0 auto; object-fit: contain; }
+    .ata-splash-name { margin-top: 8px; font-family: Rajdhani, sans-serif; font-size: clamp(24px, 7vw, 36px); font-weight: 900; letter-spacing: .10em; color: #fff; text-transform: uppercase; }
+    .ata-splash-name span { color: #FFB800; }
+    .ata-loader { width: min(62vw, 220px); height: 3px; margin: 20px auto 0; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+    .ata-loader i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #00F0FF, #FFB800, #FF5500); animation: ataLoad 1.8s ease-in-out infinite; }
+    @keyframes ataLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  </style>
+  <!-- Firebase Compat v10.14.1 -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-brand-dark min-h-screen flex flex-col antialiased selection:bg-brand-gold selection:text-black">
+
+  <!-- Startup Splash -->
+  <div id="ataStartupSplash" aria-label="Aero Trigger Arena loading">
+    <div class="ata-splash-inner">
+      <div class="w-24 h-24 mx-auto rounded-3xl bg-black/70 border border-brand-gold/40 flex items-center justify-center p-3 shadow-2xl">
+        <svg viewBox="0 0 200 200" class="w-full h-full">
+          <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB800"/><stop offset="1" stop-color="#FF5500"/></linearGradient></defs>
+          <rect x="8" y="8" width="184" height="184" rx="42" fill="#070911" stroke="url(#g)" stroke-width="7"/>
+          <path d="M47 145 L75 55 L101 55 L129 145 L108 145 L101 121 L75 121 L68 145 Z M81 101 L95 101 L88 77 Z" fill="url(#g)"/>
+          <path d="M113 55 H158 V73 H145 V145 H124 V73 H113 Z" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="ata-splash-name">AERO <span>TRIGGER</span></div>
+      <div class="text-[10px] font-bold tracking-[0.35em] text-slate-400 uppercase mt-1">ARENA • ESPORTS</div>
+      <div class="ata-loader"><i></i></div>
+      <div class="text-[9px] text-slate-500 font-bold uppercase mt-2">Connecting to Arena Backend...</div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 transform translate-y-24 opacity-0 transition-all duration-200 pointer-events-none flex items-center gap-3 px-5 py-3 rounded-2xl bg-slate-900 border border-brand-gold shadow-2xl text-sm font-bold text-white max-w-[90vw] w-max">
+    <span id="toastIcon" class="text-lg">⚡</span>
+    <span id="toastMsg" class="leading-tight text-slate-100">सूचना</span>
+  </div>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-30 bg-[#0A0D18] border-b border-brand-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex items-center justify-between h-16 sm:h-20">
+        <div class="flex items-center gap-3 select-none py-1">
+          <button type="button" id="caHiddenAdminTrigger" onclick="handleLogoTap(event)" aria-label="Aero Trigger Arena Logo" class="w-10 h-10 rounded-xl bg-black/70 border border-brand-gold/40 flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer overflow-hidden p-1">
+            <svg viewBox="0 0 200 200" class="w-full h-full">
+              <defs><linearGradient id="gh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB800"/><stop offset="1" stop-color="#FF5500"/></linearGradient></defs>
+              <rect x="8" y="8" width="184" height="184" rx="42" fill="#070911" stroke="url(#gh)" stroke-width="7"/>
+              <path d="M47 145 L75 55 L101 55 L129 145 L108 145 L101 121 L75 121 L68 145 Z M81 101 L95 101 L88 77 Z" fill="url(#gh)"/>
+              <path d="M113 55 H158 V73 H145 V145 H124 V73 H113 Z" fill="#fff"/>
+            </svg>
+          </button>
+          <div>
+            <div class="font-rajdhani font-extrabold text-xl sm:text-2xl uppercase tracking-wider text-white leading-none">
+              AERO <span class="text-brand-gold">TRIGGER</span>
+            </div>
+            <span class="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-slate-400">ARENA • ESPORTS</span>
+          </div>
+        </div>
+
+        <nav class="hidden md:flex items-center gap-6 text-sm font-bold text-slate-300">
+          <a href="#tournaments" class="hover:text-brand-gold transition-colors">टूर्नामेंट्स</a>
+          <a href="#my-tickets" class="hover:text-brand-gold transition-colors">मेरा स्लॉट पास</a>
+          <a href="#leaderboard" class="hover:text-brand-gold transition-colors">विजेता लिस्ट</a>
+          <button type="button" onclick="openPlayerEntry()" class="hover:text-brand-gold transition-colors">मेरा Dashboard</button>
+          <a href="#rules" class="hover:text-brand-gold transition-colors">नियम व शर्तें</a>
+        </nav>
+
+        <div class="flex items-center gap-2">
+          <button onclick="openWalletModal('add')" class="flex items-center gap-2 bg-brand-panel hover:bg-slate-800 border border-brand-gold/40 px-3 py-1.5 rounded-xl transition-all active:scale-95">
+            <div class="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center text-brand-gold text-xs font-bold">₹</div>
+            <div class="text-left">
+              <div class="text-[9px] uppercase font-bold text-slate-400 leading-tight">वॉलेट बैलेंस</div>
+              <div class="font-rajdhani font-black text-base sm:text-lg text-brand-gold leading-none" id="headerWalletAmount">₹0</div>
+            </div>
+            <span class="ml-1 text-[11px] font-black text-black bg-brand-gold px-2 py-0.5 rounded-md">+ रिचार्ज</span>
+          </button>
+
+          <button id="playerLoginBtn" onclick="openPlayerEntry()" class="bg-brand-panel border border-brand-gold/40 text-brand-gold px-3 py-1.5 rounded-xl text-xs font-bold active:scale-95">🔐 Login</button>
+
+          <button onclick="toggleMobileNav()" class="md:hidden p-2 text-slate-300 hover:text-white rounded-lg bg-brand-panel border border-brand-border">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="mobileNavMenu" class="hidden md:hidden border-t border-brand-border py-3 space-y-2 font-semibold text-slate-300 text-sm">
+        <a href="#tournaments" onclick="toggleMobileNav()" class="block px-2 py-1.5 hover:text-brand-gold">टूर्नामेंट्स खेलें</a>
+        <a href="#my-tickets" onclick="toggleMobileNav()" class="block px-2 py-1.5 hover:text-brand-gold">मेरा स्लॉट पास (Room ID)</a>
+        <a href="#leaderboard" onclick="toggleMobileNav()" class="block px-2 py-1.5 hover:text-brand-gold">विजेता एवं लीडरबोर्ड</a>
+        <button onclick="openPlayerEntry(); toggleMobileNav();" class="w-full text-left px-2 py-1.5 hover:text-brand-gold">👤 मेरा Dashboard</button>
+        <a href="#rules" onclick="toggleMobileNav()" class="block px-2 py-1.5 hover:text-brand-gold">टूर्नामेंट नियम</a>
+        <button onclick="openWalletModal('withdraw'); toggleMobileNav();" class="w-full text-left px-2 py-2 text-emerald-400 font-bold flex items-center gap-2">
+          <span>⚡</span> जीते हुए पैसे UPI से निकालें (Cashout)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="flex-grow">
+    <section id="home" class="py-10 sm:py-16 border-b border-brand-border">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="grid lg:grid-cols-12 gap-8 items-center">
+          <div class="lg:col-span-7 space-y-4">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-brand-gold/30 text-brand-gold text-xs font-bold">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              लाइव रियल-टाइम स्लॉट एवं वॉलेट सिंक
+            </div>
+            <h1 class="font-rajdhani font-black text-4xl sm:text-6xl uppercase tracking-tight text-white leading-none">
+              खेलो.<br>
+              <span class="text-brand-gold">जीतो.</span><br>
+              सीधे वॉलेट में पैसे पाओ!
+            </h1>
+            <p class="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
+              Google Sign-in से 1-क्लिक मैच एंट्री। मैच खत्म होते ही प्राइज मनी <strong class="text-brand-gold">सीधे आपके वॉलेट में रियल-टाइम क्रेडिट</strong> होती है।
+            </p>
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <a href="#tournaments" class="gold-gradient text-black font-rajdhani font-black text-base sm:text-lg px-6 py-2.5 rounded-xl uppercase tracking-wider active:scale-95 transition-transform">
+                मैचेस देखें
+              </a>
+              <button onclick="openWalletModal('add')" class="bg-brand-panel hover:bg-slate-800 border border-brand-border text-white font-bold text-sm px-5 py-2.5 rounded-xl flex items-center gap-2 active:scale-95">
+                <span>+</span> वॉलेट में पैसे जोड़ें
+              </button>
+            </div>
+          </div>
+
+          <div class="lg:col-span-5">
+            <div class="bg-brand-card border border-brand-border rounded-2xl p-5 shadow-xl">
+              <div class="flex items-center justify-between pb-3 border-b border-brand-border">
+                <span class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span> आज का स्पेशल मैच
+                </span>
+                <span class="text-[10px] font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded">स्लॉट तेजी से भर रहे हैं</span>
+              </div>
+              <div class="my-4 p-4 rounded-xl bg-brand-panel border border-brand-border">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <span id="featuredGame" class="text-[10px] font-bold text-brand-gold bg-amber-500/10 px-2 py-0.5 rounded">FREE FIRE MAX</span>
+                    <h3 id="featuredTitle" class="font-rajdhani font-black text-xl text-white mt-1">Daily Havoc Championship</h3>
+                    <div id="featuredTime" class="text-xs text-slate-400 mt-0.5">आज • 08:30 PM • Bermuda</div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-[10px] text-slate-400 block font-bold">एंट्री फीस</span>
+                    <div id="featuredFee" class="font-rajdhani font-black text-2xl text-brand-gold">₹20</div>
+                  </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between pt-3 border-t border-slate-800 text-xs font-semibold">
+                  <span class="text-slate-400">प्राइज पूल: <strong id="featuredPrize" class="text-emerald-400 font-bold">₹700</strong></span>
+                  <span class="text-slate-400">#1 Booyah: <strong id="featuredBooyah" class="text-brand-gold font-bold">₹400</strong></span>
+                </div>
+              </div>
+              <div class="mt-3 px-3 py-2 rounded-xl bg-brand-panel/60 border border-white/10 flex items-center justify-between text-xs">
+                <span class="text-slate-400">जुड़े हुए खिलाड़ी</span>
+                <strong id="featuredSlots" class="text-white">0 / 48</strong>
+              </div>
+              <div class="mt-3 p-3 rounded-xl bg-slate-900 border border-brand-gold/30 flex items-center justify-between">
+                <div>
+                  <div class="text-[11px] text-slate-400 font-bold">आपका वॉलेट बैलेंस</div>
+                  <div class="font-rajdhani font-black text-2xl text-brand-gold" id="heroBalanceDisplay">₹0</div>
+                </div>
+                <button id="featuredJoinBtn" onclick="openFeaturedJoin()" class="gold-gradient text-black font-rajdhani font-black text-sm px-4 py-2 rounded-xl uppercase tracking-wider active:scale-95">
+                  1-क्लिक जॉइन
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tournaments -->
+    <section id="tournaments" class="py-12 bg-brand-dark">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
+          <div>
+            <span class="text-brand-gold text-xs font-bold uppercase tracking-wider">लाइव कस्टम रूम</span>
+            <h2 class="font-rajdhani font-black text-3xl sm:text-4xl uppercase text-white mt-1">ओपन टूर्नामेंट्स</h2>
+            <p class="text-slate-400 text-xs sm:text-sm mt-1">वॉलेट बैलेंस से 1-क्लिक में तुरंत स्लॉट बुक करें।</p>
+          </div>
+          <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            <button onclick="filterTournaments('all')" id="tab-all" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase bg-brand-gold text-black">सभी गेम्स</button>
+            <button onclick="filterTournaments('ff')" id="tab-ff" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase bg-brand-card text-slate-300 border border-brand-border">Free Fire</button>
+            <button onclick="filterTournaments('bgmi')" id="tab-bgmi" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase bg-brand-card text-slate-300 border border-brand-border">BGMI</button>
+          </div>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5" id="tournamentCardsContainer">
+          <div class="col-span-full py-10 text-center text-slate-500 font-bold">टूर्नामेंट्स लोड हो रहे हैं...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slot Passes -->
+    <section id="my-tickets" class="py-12 bg-brand-panel border-y border-brand-border">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div>
+            <span class="text-brand-cyan text-xs font-bold uppercase tracking-wider">प्लेयर मैच पास (सुरक्षित)</span>
+            <h2 class="font-rajdhani font-black text-2xl sm:text-3xl uppercase text-white mt-0.5">आपके बुक किए हुए स्लॉट्स</h2>
+            <p class="text-slate-400 text-xs">मैच से 10 मिनट पहले Room ID और Password यहाँ दिखाई देगा।</p>
+          </div>
+          <button onclick="manualRefreshPasses()" class="self-start sm:self-auto text-xs font-bold text-slate-300 bg-brand-card px-3.5 py-2 rounded-xl border border-brand-border">
+            🔄 रिफ्रेश करें
+          </button>
+        </div>
+        <div id="ticketsList" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- Leaderboard -->
+    <section id="leaderboard" class="py-12 bg-brand-dark">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="mb-6">
+          <span class="text-brand-gold text-xs font-bold uppercase tracking-wider">हॉल ऑफ फेम</span>
+          <h2 class="font-rajdhani font-black text-2xl sm:text-3xl uppercase text-white mt-0.5">हालिया मैच विजेता</h2>
+        </div>
+        <div class="bg-brand-card rounded-xl border border-brand-border overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm">
+              <thead class="bg-slate-900 text-slate-400 text-[11px] font-bold uppercase border-b border-brand-border">
+                <tr>
+                  <th class="py-3 px-4">रैंक</th>
+                  <th class="py-3 px-4">प्लेयर / टीम</th>
+                  <th class="py-3 px-4">टूर्नामेंट</th>
+                  <th class="py-3 px-4">जीता हुआ कैश</th>
+                  <th class="py-3 px-4 text-right">स्टेटस</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboardTableBody" class="divide-y divide-brand-border text-slate-300"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rules -->
+    <section id="rules" class="py-10 bg-brand-panel border-t border-brand-border">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-5 sm:p-8">
+          <h3 class="font-rajdhani font-black text-xl sm:text-2xl uppercase text-white mb-3">टूर्नामेंट के जरूरी नियम</h3>
+          <ul class="space-y-2.5 text-xs sm:text-sm text-slate-300">
+            <li class="flex items-start gap-2"><span class="text-rose-500 font-bold">✕</span><span><strong>कोई एमुलेटर (PC) नहीं:</strong> केवल मोबाइल एवं टैबलेट प्लेयर्स ही खेल सकते हैं।</span></li>
+            <li class="flex items-start gap-2"><span class="text-brand-gold font-bold">✓</span><span><strong>सही स्लॉट पर बैठना:</strong> आपके स्लॉट पास पर जो नंबर है, रूम में उसी स्लॉट पर बैठना अनिवार्य है।</span></li>
+            <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">✓</span><span><strong>ऑटोमैटिक प्राइज:</strong> मैच रिजल्ट वेरीफाई होने के बाद जीता हुआ कैश सीधे वॉलेट में क्रेडिट होता है।</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-[#05070C] border-t border-brand-border py-6 text-slate-400 text-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg bg-black/70 border border-brand-gold/40 flex items-center justify-center p-1">
+          <svg viewBox="0 0 200 200" class="w-full h-full">
+            <defs><linearGradient id="gf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB800"/><stop offset="1" stop-color="#FF5500"/></linearGradient></defs>
+            <rect x="8" y="8" width="184" height="184" rx="42" fill="#070911" stroke="url(#gf)" stroke-width="7"/>
+            <path d="M47 145 L75 55 L101 55 L129 145 L108 145 L101 121 L75 121 L68 145 Z" fill="url(#gf)"/>
+          </svg>
+        </div>
+        <span class="font-rajdhani font-bold text-sm text-white">AERO <span class="text-brand-gold">TRIGGER</span> ARENA</span>
+      </div>
+      <div>© 2026 Aero Trigger Arena. All Rights Reserved.</div>
+    </div>
+  </footer>
+
+  <!-- Google Auth Modal -->
+  <div id="playerAuthModal" class="fixed inset-0 z-[60] hidden overflow-y-auto bg-black/90 text-white backdrop-blur-sm">
+    <div class="min-h-screen relative flex items-center justify-center px-4 py-8">
+      <div class="relative w-full max-w-[420px] rounded-3xl border border-white/10 bg-[#0D0D13] p-6 shadow-2xl">
+        <button onclick="closePlayerAuthModal()" class="absolute right-4 top-4 w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center">✕</button>
+        <div class="text-center pt-2 pb-5">
+          <div class="mx-auto w-20 h-20 rounded-2xl border border-brand-gold/40 bg-black/40 flex items-center justify-center p-3">
+            <svg viewBox="0 0 200 200" class="w-full h-full">
+              <defs><linearGradient id="gm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB800"/><stop offset="1" stop-color="#FF5500"/></linearGradient></defs>
+              <rect x="8" y="8" width="184" height="184" rx="42" fill="#070911" stroke="url(#gm)" stroke-width="7"/>
+              <path d="M47 145 L75 55 L101 55 L129 145 L108 145 L101 121 L75 121 L68 145 Z" fill="url(#gm)"/>
+            </svg>
+          </div>
+          <h3 class="mt-4 font-rajdhani font-black text-2xl text-white">AERO <span class="text-brand-gold">TRIGGER</span> ARENA</h3>
+          <p id="authSubtitle" class="text-xs text-slate-400 mt-1">Google account से सुरक्षित Login करें</p>
+        </div>
+
+        <div id="authGoogleStep" class="space-y-4">
+          <div class="rounded-2xl bg-brand-gold/5 border border-brand-gold/20 p-4 text-center">
+            <div class="text-3xl mb-1">🌐</div>
+            <div class="text-base font-bold text-white">1-क्लिक Google Sign-In</div>
+            <div class="text-xs text-slate-400 mt-1">SMS OTP की कोई जरूरत नहीं। सुरक्षित व तुरंत लॉगिन।</div>
+          </div>
+          <button type="button" onclick="loginWithGoogle()" id="googleLoginBtn" class="w-full rounded-2xl py-3.5 bg-gradient-to-r from-brand-gold to-yellow-400 text-black font-rajdhani font-black text-base tracking-wide shadow-lg active:scale-95 transition flex items-center justify-center gap-2">
+            <span>🌐</span> CONTINUE WITH GOOGLE
+          </button>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-3 text-[11px] text-slate-400 text-center">
+            पहली बार लॉगिन करने पर केवल एक बार गेम एवं मोबाइल नंबर पूछा जाएगा।
+          </div>
+        </div>
+
+        <div id="authProfileStep" class="hidden space-y-4">
+          <div class="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-300">
+            ✓ Google Account Verified! कृपया अपनी प्लेयर प्रोफाइल पूरी करें।
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500">Player Name (Google)</div>
+            <div id="authGoogleDisplayName" class="mt-0.5 text-base font-bold text-white">Player</div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Game चुनें</label>
+            <select id="authGameSelect" class="w-full bg-[#15151D] border border-white/15 focus:border-brand-gold/70 rounded-xl px-3 py-2.5 text-white text-xs outline-none">
+              <option value="Free Fire MAX">Free Fire MAX</option>
+              <option value="BGMI">BGMI</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Game ID / UID</label>
+            <input type="text" id="authGameId" class="w-full bg-[#15151D] border border-white/15 focus:border-brand-gold/70 rounded-xl px-3 py-2.5 text-white text-xs outline-none" placeholder="जैसे: 1049285023">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Mobile Number</label>
+            <div class="flex">
+              <span class="flex items-center px-3 rounded-l-xl bg-[#15151D] border border-r-0 border-white/15 text-slate-400 text-xs">+91</span>
+              <input type="tel" id="authMobile" maxlength="10" inputmode="numeric" class="w-full bg-[#15151D] border border-white/15 focus:border-brand-gold/70 rounded-r-xl px-3 py-2.5 text-white text-xs outline-none" placeholder="10 digit mobile">
+            </div>
+            <span class="text-[10px] text-slate-500 mt-1 block">संपर्क और प्राइज सपोर्ट के लिए। OTP नहीं आएगा।</span>
+          </div>
+          <button onclick="saveNewPlayerProfile()" id="saveProfileBtn" class="w-full rounded-2xl py-3.5 bg-gradient-to-r from-brand-gold to-yellow-400 text-black font-rajdhani font-black text-base tracking-wide active:scale-95 transition">
+            SAVE & CONTINUE
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wallet Modal -->
+  <div id="walletModal" class="fixed inset-0 z-50 bg-black/90 hidden smooth-mobile-scroll p-3 sm:p-6 backdrop-blur-sm">
+    <div class="min-h-full flex items-start justify-center py-4">
+      <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 border-b border-brand-border mb-4">
+          <h3 class="font-rajdhani font-black text-xl text-white flex items-center gap-2">
+            <span>💳</span> Aero Trigger Arena वॉलेट
+          </h3>
+          <button onclick="closeWalletModal()" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold">✕</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <div class="p-3 rounded-xl bg-brand-panel border border-brand-border">
+            <span class="text-[10px] text-slate-400 uppercase font-bold block">डिपॉजिट बैलेंस</span>
+            <div class="font-rajdhani font-black text-xl text-brand-gold" id="modalDepositBalance">₹0</div>
+            <span class="text-[9px] text-slate-400">मैच एंट्री के लिए</span>
+          </div>
+          <div class="p-3 rounded-xl bg-brand-panel border border-emerald-500/30">
+            <span class="text-[10px] text-emerald-400 uppercase font-bold block">जीता हुआ बैलेंस</span>
+            <div class="font-rajdhani font-black text-xl text-emerald-400" id="modalWinningsBalance">₹0</div>
+            <span class="text-[9px] text-slate-400">UPI में निकालने हेतु</span>
+          </div>
+        </div>
+
+        <div class="flex border-b border-brand-border mb-4">
+          <button onclick="switchWalletTab('add')" id="wtab-add" class="flex-1 pb-2 text-xs font-bold border-b-2 border-brand-gold text-brand-gold">+ पैसे जोड़ें</button>
+          <button onclick="switchWalletTab('withdraw')" id="wtab-withdraw" class="flex-1 pb-2 text-xs font-bold border-b-2 border-transparent text-slate-400">⚡ पैसे निकालें</button>
+          <button onclick="switchWalletTab('history')" id="wtab-history" class="flex-1 pb-2 text-xs font-bold border-b-2 border-transparent text-slate-400">पासबुक</button>
+        </div>
+
+        <!-- Deposit Tab -->
+        <div id="walletTabDeposit" class="space-y-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">अमाउंट चुनें (कम से कम ₹20)</label>
+            <div class="grid grid-cols-4 gap-2 mb-2">
+              <button onclick="selectTopupAmount(50)" class="py-1.5 rounded-lg bg-brand-panel border border-brand-border text-xs font-bold">₹50</button>
+              <button onclick="selectTopupAmount(100)" class="py-1.5 rounded-lg bg-brand-panel border border-brand-gold text-brand-gold text-xs font-bold">₹100</button>
+              <button onclick="selectTopupAmount(200)" class="py-1.5 rounded-lg bg-brand-panel border border-brand-border text-xs font-bold">₹200</button>
+              <button onclick="selectTopupAmount(500)" class="py-1.5 rounded-lg bg-brand-panel border border-brand-border text-xs font-bold">₹500</button>
+            </div>
+            <input type="number" id="customDepositInput" value="100" min="20" class="w-full bg-brand-panel border border-brand-border rounded-xl px-3 py-2 text-white text-sm font-bold">
+          </div>
+
+          <div class="bg-brand-panel p-3 rounded-xl border border-brand-border text-center">
+            <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Paytm / PhonePe / GPay QR</span>
+            <div class="inline-block p-2 bg-white rounded-xl shadow-lg my-1">
+              <img id="qrImageElement" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi%3A%2F%2Fpay%3Fpa%3Dpaytm.s3qpmwg%40pty%26pn%3DAeroTriggerArena%26cu%3DINR" alt="Payment QR" class="w-44 h-44 object-contain">
+            </div>
+            <div class="mt-2 flex items-center justify-between gap-2 bg-slate-900 px-3 py-2 rounded-lg text-[11px] font-mono">
+              <span class="truncate">UPI: <strong>paytm.s3qpmwg@pty</strong></span>
+              <div class="flex items-center gap-1 shrink-0">
+                <button onclick="openUpiPayment()" class="bg-brand-gold text-black font-bold px-2 py-1 rounded">PAY UPI</button>
+                <button onclick="copyUpiId()" class="text-brand-gold font-bold px-1">कॉपी</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">पेमेंट के बाद UTR नंबर दर्ज करें (10–22 अंक)</label>
+            <input type="text" id="depositUtrInput" maxlength="22" inputmode="numeric" class="w-full bg-brand-panel border border-brand-border rounded-xl px-3 py-2 text-white text-xs font-mono" placeholder="जैसे: 412345678901">
+          </div>
+
+          <button onclick="submitWalletDeposit()" id="depositSubmitBtn" class="w-full gold-gradient text-black font-rajdhani font-black text-base py-2.5 rounded-xl uppercase tracking-wider active:scale-95 transition">
+            वेरिफिकेशन के लिए सबमिट करें
+          </button>
+        </div>
+
+        <!-- Withdraw Tab -->
+        <div id="walletTabWithdraw" class="hidden space-y-3">
+          <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+            <span class="text-xs text-slate-300 font-medium">निकालने योग्य बैलेंस:</span>
+            <div class="font-rajdhani font-black text-2xl text-emerald-400" id="withdrawMaxDisplay">₹0</div>
+            <span class="text-[10px] text-slate-400 block mt-0.5">न्यूनतम विड्रॉल: ₹50</span>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">अमाउंट (₹)</label>
+            <input type="number" id="withdrawAmountInput" value="50" min="50" class="w-full bg-brand-panel border border-brand-border rounded-xl px-3 py-2 text-white text-sm font-bold">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">आपकी UPI ID</label>
+            <input type="text" id="withdrawUpiInput" class="w-full bg-brand-panel border border-brand-border rounded-xl px-3 py-2 text-white text-xs font-mono" placeholder="जैसे: 9876543210@paytm">
+          </div>
+          <button onclick="submitWithdrawalRequest()" id="withdrawSubmitBtn" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-rajdhani font-black text-base py-2.5 rounded-xl uppercase tracking-wider active:scale-95 transition">
+            पैसे निकालने की रिक्वेस्ट भेजें
+          </button>
+        </div>
+
+        <!-- Passbook Tab -->
+        <div id="walletTabHistory" class="hidden space-y-2">
+          <div class="text-[11px] font-bold text-slate-400 uppercase">हालिया पासबुक लेन-देन</div>
+          <div class="max-h-56 overflow-y-auto space-y-1.5 pr-1" id="passbookContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1-Click Match Join Modal -->
+  <div id="joinModal" class="fixed inset-0 z-50 bg-black/90 hidden smooth-mobile-scroll p-3 sm:p-6 backdrop-blur-sm">
+    <div class="min-h-full flex items-start justify-center py-4">
+      <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl relative">
+        <button onclick="closeJoinModal()" class="absolute top-4 right-4 text-slate-400 font-bold text-lg">✕</button>
+        <div class="mb-4">
+          <span class="text-[10px] font-bold text-brand-gold uppercase" id="modalTournGame">गेम</span>
+          <h3 class="font-rajdhani font-black text-xl text-white" id="modalTournName">मैच का नाम</h3>
+          <div class="flex items-center gap-3 mt-1 text-xs text-slate-400">
+            <span>समय: <strong class="text-white" id="modalTournTime">8:00 PM</strong></span>
+            <span>•</span>
+            <span>फीस: <strong class="text-brand-gold font-bold" id="modalTournFee">₹20</strong></span>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Game UID / Player ID</label>
+            <input type="text" id="regGameUid" class="w-full bg-brand-panel border border-brand-border rounded-xl px-3 py-2 text-white text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">In-Game Name (IGN)</label>
+            <input type="text" id="regPlayerName" class="w-full bg-brand-panel border border-brand-border rounded-xl px-3 py-2 text-white text-xs">
+          </div>
+          <div class="p-3 rounded-xl bg-brand-panel border border-brand-gold/30">
+            <div class="flex items-center justify-between text-xs font-bold">
+              <span class="text-white">⚡ वॉलेट से 1-क्लिक पेमेंट</span>
+              <span class="text-brand-gold font-rajdhani text-sm" id="regWalletBalDisplay">बैलेंस: ₹0</span>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">फीस वॉलेट से कटेगी और स्लॉट पास तुरंत जारी होगा।</p>
+          </div>
+          <button onclick="confirmWalletJoin()" id="joinSubmitBtn" class="w-full gold-gradient text-black font-rajdhani font-black text-base py-2.5 rounded-xl uppercase tracking-wider active:scale-95 transition">
+            ⚡ स्लॉट पास कन्फर्म करें
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Player Dashboard Modal -->
+  <div id="playerDashboardModal" class="hidden fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm overflow-y-auto">
+    <div class="min-h-full flex items-start sm:items-center justify-center p-3 sm:p-6">
+      <div class="w-full max-w-2xl rounded-3xl border border-brand-border bg-[#0B0F1D] shadow-2xl overflow-hidden">
+        <div class="p-5 sm:p-6 border-b border-brand-border bg-gradient-to-br from-brand-panel to-[#0B0F1D]">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-2xl gold-gradient flex items-center justify-center font-rajdhani font-black text-xl text-black">ATA</div>
+              <div>
+                <div class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Player Dashboard</div>
+                <div id="dashPlayerName" class="text-xl font-black text-white">Player</div>
+                <div id="dashClutchId" class="text-xs text-brand-gold font-bold mt-0.5">—</div>
+              </div>
+            </div>
+            <button onclick="closePlayerDashboard()" class="w-9 h-9 rounded-xl bg-white/5 border border-brand-border text-slate-300 text-lg">✕</button>
+          </div>
+        </div>
+
+        <div class="p-4 sm:p-6 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="rounded-2xl border border-brand-border bg-white/[0.03] p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">Joined</div><div id="dashJoinedCount" class="text-2xl font-rajdhani font-black text-white mt-1">0</div></div>
+            <div class="rounded-2xl border border-brand-border bg-white/[0.03] p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">Deposit</div><div id="dashDeposit" class="text-2xl font-rajdhani font-black text-brand-gold mt-1">₹0</div></div>
+            <div class="rounded-2xl border border-brand-border bg-white/[0.03] p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">Winnings</div><div id="dashWinnings" class="text-2xl font-rajdhani font-black text-emerald-400 mt-1">₹0</div></div>
+            <div class="rounded-2xl border border-brand-border bg-white/[0.03] p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">Status</div><div class="text-lg font-black text-emerald-400 mt-2">● Active</div></div>
+          </div>
+
+          <div class="rounded-2xl border border-brand-border bg-white/[0.03] p-4">
+            <div class="flex items-center justify-between mb-3"><h3 class="font-black text-white">👤 My Profile</h3></div>
+            <div class="grid sm:grid-cols-2 gap-3 text-sm">
+              <div class="rounded-xl bg-black/20 p-3"><div class="text-[10px] uppercase text-slate-500">Game ID</div><div id="dashGameId" class="font-bold text-white mt-1">—</div></div>
+              <div class="rounded-xl bg-black/20 p-3"><div class="text-[10px] uppercase text-slate-500">Mobile</div><div id="dashPhone" class="font-bold text-white mt-1">—</div></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-3"><h3 class="font-black text-white">🎮 My Tournaments</h3><button onclick="closePlayerDashboard(); document.getElementById('tournaments')?.scrollIntoView({behavior:'smooth'});" class="text-xs font-bold text-brand-gold">Browse</button></div>
+            <div id="dashTournamentList" class="space-y-3"></div>
+          </div>
+
+          <div class="rounded-2xl border border-brand-gold/20 bg-brand-gold/5 p-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="font-black text-white">🎁 Refer & Win</div>
+                <div class="text-[10px] text-slate-400 mt-1">अपने दोस्तों के साथ रेफरल कोड शेयर करें।</div>
+              </div>
+              <button onclick="shareReferralLink()" class="shrink-0 rounded-xl bg-brand-gold text-black px-3 py-2 text-xs font-black">SHARE</button>
+            </div>
+            <div class="mt-3 flex items-center gap-2 rounded-xl bg-black/25 border border-white/5 p-2">
+              <span id="dashboardReferralCode" class="font-mono text-brand-gold font-black text-sm truncate">—</span>
+              <button onclick="copyReferralCode()" class="ml-auto text-xs font-bold text-slate-300">COPY</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="closePlayerDashboard(); openWalletModal('add');" class="rounded-2xl py-3.5 bg-brand-gold text-black font-black">₹ Recharge Wallet</button>
+            <button onclick="closePlayerDashboard(); openWalletModal('withdraw');" class="rounded-2xl py-3.5 bg-white/5 border border-emerald-400/20 text-emerald-300 font-black">↗ Cashout</button>
+          </div>
+
+          <button onclick="logoutPlayer(); closePlayerDashboard();" class="w-full rounded-2xl py-3 border border-rose-400/20 bg-rose-400/5 text-rose-300 font-bold">🚪 Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Console (Protected by Logo-Tap & Auth) -->
+  <div id="adminDeskModal" class="fixed inset-0 z-50 bg-[#070911] hidden smooth-mobile-scroll p-2 sm:p-4">
+    <div class="max-w-4xl mx-auto pb-16">
+      <div class="sticky top-0 z-20 bg-[#0C101E] px-4 py-3 border-b border-brand-border flex items-center justify-between rounded-xl shadow-lg mb-4">
+        <div>
+          <span class="text-[10px] font-bold text-brand-cyan uppercase block">Aero Trigger Arena Console</span>
+          <h2 class="font-rajdhani font-black text-xl text-white">ऑर्गनाइजर एवं एडमिन डेस्क</h2>
+          <span class="text-[9px] text-emerald-400">● Verified Admin: shindhvaatul@gmail.com</span>
+        </div>
+        <button onclick="closeAdminDesk()" class="bg-rose-950 border border-rose-600/50 text-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95">✕ बाहर निकलें</button>
+      </div>
+
+      <div class="space-y-4">
+        <!-- 3-Click 10-Second Prize Distribution -->
+        <div class="p-4 rounded-xl bg-brand-card border border-brand-gold/40">
+          <div class="mb-2">
+            <h4 class="font-rajdhani font-black text-lg text-brand-gold flex items-center gap-1.5">
+              <span>⚡</span> 10-सेकंड प्राइज डिस्ट्रीब्यूटर (ऑटो-क्रेडिट)
+            </h4>
+            <p class="text-[11px] text-slate-300">मैच खत्म होने पर टॉप 3 स्लॉट्स चुनें। 1-क्लिक में विनर के वॉलेट में प्राइज रियल-टाइम क्रेडिट हो जाएगा!</p>
+          </div>
+          <div class="grid sm:grid-cols-3 gap-2 my-3">
+            <div class="p-2.5 rounded-lg bg-slate-900 border border-amber-500/30">
+              <div class="flex justify-between text-[11px] font-bold text-amber-400 mb-1">
+                <span>👑 रैंक #1 (Booyah)</span>
+                <span class="text-emerald-400">+₹400</span>
+              </div>
+              <select id="distributeRank1Slot" class="w-full bg-brand-panel border border-brand-border rounded-lg p-2 text-white text-xs font-bold"></select>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-700">
+              <div class="flex justify-between text-[11px] font-bold text-slate-300 mb-1">
+                <span>🥈 रैंक #2</span>
+                <span class="text-emerald-400">+₹200</span>
+              </div>
+              <select id="distributeRank2Slot" class="w-full bg-brand-panel border border-brand-border rounded-lg p-2 text-white text-xs font-bold"></select>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-700">
+              <div class="flex justify-between text-[11px] font-bold text-slate-300 mb-1">
+                <span>🥉 रैंक #3</span>
+                <span class="text-emerald-400">+₹100</span>
+              </div>
+              <select id="distributeRank3Slot" class="w-full bg-brand-panel border border-brand-border rounded-lg p-2 text-white text-xs font-bold"></select>
+            </div>
+          </div>
+          <button onclick="autoDistributeMatchPrizes()" id="autoDistributeBtn" class="w-full gold-gradient text-black font-rajdhani font-black text-sm py-2.5 rounded-xl uppercase tracking-wider active:scale-95 transition">
+            🚀 वॉलेट में प्राइज ऑटो-क्रेडिट करें
+          </button>
+        </div>
+
+        <!-- Deposit Approval Desk -->
+        <div class="p-4 rounded-xl bg-brand-card border border-amber-500/40">
+          <h4 class="font-rajdhani font-black text-base text-white mb-2 flex items-center gap-1.5">
+            <span class="text-amber-400">🚨</span> डिपॉजिट अप्रूवल डेस्क (Paytm UTR Verification)
+          </h4>
+          <div class="overflow-x-auto rounded-lg border border-brand-border">
+            <table class="w-full text-left text-xs min-w-[500px]">
+              <thead class="bg-slate-900 text-slate-400 font-bold uppercase">
+                <tr>
+                  <th class="py-2.5 px-3">आईडी</th>
+                  <th class="py-2.5 px-3">प्लेयर</th>
+                  <th class="py-2.5 px-3">अमाउंट</th>
+                  <th class="py-2.5 px-3">UTR नंबर</th>
+                  <th class="py-2.5 px-3">स्टेटस</th>
+                  <th class="py-2.5 px-3 text-right">एक्शन</th>
+                </tr>
+              </thead>
+              <tbody id="adminDepositVerifyTable" class="divide-y divide-brand-border text-slate-300"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Create Tournament -->
+        <div class="p-4 rounded-xl bg-brand-card border border-brand-border">
+          <h4 class="font-rajdhani font-black text-base text-white mb-2 flex items-center gap-1.5">
+            <span class="text-brand-gold">➕</span> नया टूर्नामेंट पब्लिश करें
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">गेम</label>
+              <select id="newMatchCategory" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs">
+                <option value="ff">Free Fire MAX</option>
+                <option value="bgmi">BGMI / PUBG</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">मैच नाम</label>
+              <input type="text" id="newMatchTitle" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs" placeholder="Bermuda Havoc #106">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">मैप / मोड</label>
+              <input type="text" id="newMatchMap" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs" placeholder="Bermuda • Squad">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">समय</label>
+              <input type="text" id="newMatchTime" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs" placeholder="आज • 09:30 PM">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">एंट्री फीस (₹)</label>
+              <input type="number" id="newMatchFee" value="20" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">प्राइज पूल (₹)</label>
+              <input type="number" id="newMatchPrize" value="700" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">पर किल (₹)</label>
+              <input type="number" id="newMatchPerKill" value="10" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">टोटल स्लॉट्स</label>
+              <input type="number" id="newMatchMaxSlots" value="48" class="w-full bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs">
+            </div>
+          </div>
+          <button onclick="createNewTournament()" class="mt-3 gold-gradient text-black font-rajdhani font-black text-xs px-4 py-2 rounded-lg uppercase tracking-wider active:scale-95 transition">
+            ✓ वेबसाइट पर पब्लिश करें
+          </button>
+        </div>
+
+        <!-- Room ID Broadcaster with intuitive tournament selector -->
+        <div class="p-4 rounded-xl bg-brand-card border border-brand-cyan/30">
+          <h4 class="font-rajdhani font-bold text-base text-white mb-2 flex items-center gap-1.5">
+            <span class="text-brand-cyan">📡</span> Room ID & Password ब्रॉडकास्ट करें
+          </h4>
+          <div class="grid sm:grid-cols-4 gap-2">
+            <select id="adminBroadcastTournSelect" class="bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs"></select>
+            <input type="text" id="adminBroadcastRoomId" class="bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs font-mono" placeholder="Room ID">
+            <input type="text" id="adminBroadcastPass" class="bg-slate-900 border border-brand-border rounded-lg p-2 text-white text-xs font-mono" placeholder="Password">
+            <button onclick="broadcastCredentials()" class="bg-brand-cyan text-black font-bold p-2 rounded-lg text-xs active:scale-95 transition">
+              प्लेयर्स को भेजें
+            </button>
+          </div>
+        </div>
+
+        <!-- Tournament Control list -->
+        <div class="p-4 rounded-xl bg-brand-card border border-brand-gold/30">
+          <h4 class="font-rajdhani font-black text-base text-white mb-3">🎮 Tournament Controls</h4>
+          <div id="adminTournamentControlList" class="space-y-2"></div>
+        </div>
+
+        <!-- Player Withdrawal Desk -->
+        <div class="p-4 rounded-xl bg-brand-card border border-brand-border">
+          <h4 class="font-rajdhani font-black text-base text-white mb-2">प्लेयर विड्रॉल डेस्क (Direct UPI Payout)</h4>
+          <div class="overflow-x-auto rounded-lg border border-brand-border">
+            <table class="w-full text-left text-xs min-w-[500px]">
+              <thead class="bg-slate-900 text-slate-400 font-bold uppercase">
+                <tr>
+                  <th class="py-2.5 px-3">आईडी</th>
+                  <th class="py-2.5 px-3">UPI ID</th>
+                  <th class="py-2.5 px-3">अमाउंट</th>
+                  <th class="py-2.5 px-3">स्टेटस</th>
+                  <th class="py-2.5 px-3 text-right">एक्शन</th>
+                </tr>
+              </thead>
+              <tbody id="adminWithdrawTable" class="divide-y border-brand-border text-slate-300"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Engine -->
+  <script>
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyDjdI9wtb-wP8L-4Mv15hwBLgNXdQzodAs",
+      authDomain: "clutcharena-f928d.firebaseapp.com",
+      projectId: "clutcharena-f928d",
+      storageBucket: "clutcharena-f928d.firebasestorage.app",
+      messagingSenderId: "736422081108",
+      appId: "1:736422081108:web:5553d82d4d26ccb96c73c1",
+      measurementId: "G-MDSEPLHEZR"
+    };
+
+    let firebaseReady = false;
+    let db = null;
+    let auth = null;
+    let currentPlayer = null;
+    let pendingAuthUser = null;
+    let currentTournForJoin = null;
+    let logoTapCount = 0;
+    let logoTapTimer = null;
+    let featuredTournamentId = null;
+
+    let tournaments = [];
+    let registeredPasses = [];
+    let passbook = [];
+    let pendingDeposits = [];
+    let withdrawalQueue = [];
+    let leaderboardData = [];
+    let depositBalance = 0;
+    let winningsBalance = 0;
+
+    let unsubs = { tournaments: null, wallet: null, passes: null, passbook: null, deposits: null, withdrawals: null };
+    let credentialUnsubs = {};
+    let joinedCredentials = {};
+
+    // Toast
+    function showToast(msg, icon = '⚡') {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      document.getElementById('toastMsg').textContent = msg;
+      document.getElementById('toastIcon').textContent = icon;
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-24', 'opacity-0');
+      }, 3000);
+    }
+
+    // Copy to clipboard helper
+    function copyText(text, label = 'क्रेडेंशियल') {
+      if (!text || text.includes('लाइव') || text.includes('पेंडिंग')) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(`${label} कॉपी हो गया!`, "📋");
+        }).catch(() => {
+          fallbackCopyText(text, label);
+        });
+      } else {
+        fallbackCopyText(text, label);
+      }
+    }
+
+    function fallbackCopyText(text, label) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(`${label} कॉपी हो गया!`, "📋");
+      } catch (e) {
+        showToast("कॉपी नहीं हो सका", "⚠️");
+      }
+      document.body.removeChild(ta);
+    }
+
+    // Initialize Firebase
+    function initApp() {
+      try {
+        const initUrlParams = new URLSearchParams(window.location.search);
+        const urlRef = initUrlParams.get('ref');
+        if (urlRef) sessionStorage.setItem('ata_ref_code', urlRef.trim());
+      } catch (_) {}
+
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+        auth = firebase.auth();
+        db = firebase.firestore();
+        firebaseReady = true;
+
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+        auth.getRedirectResult().catch(() => {});
+        auth.onAuthStateChanged(handleAuthStateChange);
+        setupRealtimeTournaments();
+        setupRealtimeLeaderboard();
+      } catch (e) {
+        console.error("Firebase init error:", e);
+        showToast("Firebase initialization error", "❌");
+      }
+    }
+
+    // Realtime Tournaments Listener
+    function setupRealtimeTournaments() {
+      if (!db) return;
+      if (unsubs.tournaments) unsubs.tournaments();
+      unsubs.tournaments = db.collection('tournaments').orderBy('createdAtMs', 'desc').limit(50).onSnapshot(snap => {
+        if (!snap.empty) {
+          tournaments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } else {
+          // Seed initial tournaments if collection is completely fresh
+          seedInitialTournaments();
+        }
+        renderTournaments();
+        updateAdminTournSelect();
+        if (typeof renderAdminTournamentControl === 'function') renderAdminTournamentControl();
+      }, err => {
+        console.warn("Tournaments sync error:", err);
+      });
+    }
+
+    async function seedInitialTournaments() {
+      const initial = [
+        { id: 'ff-daily-101', category: 'ff', gameName: 'Free Fire MAX', title: 'Daily Havoc Squad Championship', map: 'Bermuda', mode: 'Squad', time: 'आज • 08:30 PM', entryFee: 20, prizePool: 700, perKill: 10, maxSlots: 48, filledSlots: 0, firstPrize: 400, hasCredentials: false, status: 'OPEN', createdAtMs: Date.now() },
+        { id: 'bgmi-erangel-201', category: 'bgmi', gameName: 'BGMI', title: 'Erangel Clash Special', map: 'Erangel', mode: 'Squad', time: 'आज • 09:30 PM', entryFee: 30, prizePool: 1100, perKill: 15, maxSlots: 48, filledSlots: 0, firstPrize: 600, hasCredentials: false, status: 'OPEN', createdAtMs: Date.now() - 1000 }
+      ];
+      tournaments = initial;
+      renderTournaments();
+    }
+
+    // Realtime Leaderboard
+    function setupRealtimeLeaderboard() {
+      if (!db) return;
+      db.collection('prizeLedger').orderBy('createdAtMs', 'desc').limit(10).onSnapshot(snap => {
+        if (!snap.empty) {
+          leaderboardData = snap.docs.map(d => {
+            const data = d.data();
+            return { rank: data.rank || '👑 #1', name: data.playerName || 'Player', match: data.tournTitle || 'Match', prize: `₹${data.amount || 0}`, status: 'क्रेडिट हुआ ✓' };
+          });
+        } else {
+          leaderboardData = [
+            { rank: "👑 #1 Booyah", name: "VIPER_99", match: "Bermuda Championship", prize: "₹400", status: "क्रेडिट हुआ ✓" },
+            { rank: "🥈 #2 Runner-up", name: "TEAM_SOUL", match: "Bermuda Championship", prize: "₹200", status: "क्रेडिट हुआ ✓" }
+          ];
+        }
+        renderLeaderboard();
+      }, () => {});
+    }
+
+    // Auth State Change Handler
+    async function handleAuthStateChange(user) {
+      if (user) {
+        try {
+          const snap = await db.collection('users').doc(user.uid).get();
+          if (snap.exists) {
+            const data = snap.data();
+            if (data.game && data.gameId && data.phone) {
+              currentPlayer = { ...data, uid: user.uid, email: user.email };
+              updatePlayerUI();
+              setupUserRealtime(user.uid);
+              closePlayerAuthModal();
+              return;
+            }
+          }
+          // Profile missing required data
+          pendingAuthUser = user;
+          openProfileSetupModal(user);
+        } catch (e) {
+          console.error("Profile load error:", e);
+        }
+      } else {
+        // Logged out: strictly wipe out all private data & credentials
+        currentPlayer = null;
+        pendingAuthUser = null;
+        depositBalance = 0;
+        winningsBalance = 0;
+        registeredPasses = [];
+        passbook = [];
+        cleanupUserListeners();
+        cleanupCredentialsListeners();
+        updatePlayerUI();
+        renderTournaments();
+        renderTickets();
+      }
+    }
+
+    function setupUserRealtime(uid) {
+      cleanupUserListeners();
+      // Wallet Listener
+      unsubs.wallet = db.collection('wallets').doc(uid).onSnapshot(snap => {
+        if (snap.exists) {
+          const data = snap.data();
+          depositBalance = Number(data.deposit) || 0;
+          winningsBalance = Number(data.winnings) || 0;
+        } else {
+          db.collection('wallets').doc(uid).set({ uid, deposit: 0, winnings: 0, updatedAtMs: Date.now() }, { merge: true });
+          depositBalance = 0;
+          winningsBalance = 0;
+        }
+        updateWalletUI();
+      });
+
+      // Passes Listener (User can strictly only read their own registered passes via Firestore rules)
+      unsubs.passes = db.collection('registeredPasses').where('playerUid', '==', uid).onSnapshot(snap => {
+        registeredPasses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderTickets();
+        renderTournaments();
+        syncJoinedTournamentsCredentials();
+      });
+
+      // Passbook Listener
+      unsubs.passbook = db.collection('walletPassbook').where('uid', '==', uid).onSnapshot(snap => {
+        passbook = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        passbook.sort((a,b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+        renderPassbook();
+      });
+    }
+
+    // Real-time synchronization of Custom Room ID and Password ONLY for contests the user joined
+    function syncJoinedTournamentsCredentials() {
+      if (!auth || !auth.currentUser) {
+        cleanupCredentialsListeners();
+        return;
+      }
+      const joinedTournIds = new Set(registeredPasses.map(p => p.tournId).filter(Boolean));
+
+      // Unsubscribe any listeners for contests no longer in joined list
+      Object.keys(credentialUnsubs).forEach(tId => {
+        if (!joinedTournIds.has(tId)) {
+          if (credentialUnsubs[tId]) {
+            try { credentialUnsubs[tId](); } catch (_) {}
+          }
+          delete credentialUnsubs[tId];
+          delete joinedCredentials[tId];
+        }
+      });
+
+      // Attach listener ONLY for contests this player successfully joined
+      // Protected by Firestore rules: tournamentCredentials/{tournId} requires exists(registeredPasses/tournId__uid)
+      joinedTournIds.forEach(tId => {
+        if (!tId || credentialUnsubs[tId]) return;
+        try {
+          credentialUnsubs[tId] = db.collection('tournamentCredentials').doc(tId).onSnapshot(snap => {
+            if (snap.exists) {
+              joinedCredentials[tId] = snap.data();
+            } else {
+              joinedCredentials[tId] = null;
+            }
+            renderTickets();
+            renderTournaments();
+          }, err => {
+            // Expected if user is not authorized or not joined
+            console.warn(`Protected credentials read rejected for ${tId}:`, err.message);
+          });
+        } catch (err) {
+          console.warn("Credential attach warning:", err);
+        }
+      });
+    }
+
+    function cleanupCredentialsListeners() {
+      Object.keys(credentialUnsubs).forEach(tId => {
+        if (credentialUnsubs[tId]) {
+          try { credentialUnsubs[tId](); } catch (_) {}
+        }
+      });
+      credentialUnsubs = {};
+      joinedCredentials = {};
+    }
+
+    function cleanupUserListeners() {
+      if (unsubs.wallet) { unsubs.wallet(); unsubs.wallet = null; }
+      if (unsubs.passes) { unsubs.passes(); unsubs.passes = null; }
+      if (unsubs.passbook) { unsubs.passbook(); unsubs.passbook = null; }
+      cleanupCredentialsListeners();
+    }
+
+    // Google Sign-In
+    async function loginWithGoogle() {
+      if (!firebaseReady) return showToast('Firebase तैयार नहीं है।', '⚠️');
+      const btn = document.getElementById('googleLoginBtn');
+      if (btn) btn.disabled = true;
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      try {
+        const res = await auth.signInWithPopup(provider);
+        showToast("Google से लॉगिन सफल!", "✓");
+      } catch (e) {
+        if (e.code === 'auth/popup-blocked') {
+          await auth.signInWithRedirect(provider);
+        } else {
+          showToast(e.message || "लॉगिन असफल", "❌");
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function openPlayerAuthModal() {
+      document.getElementById('authGoogleStep')?.classList.remove('hidden');
+      document.getElementById('authProfileStep')?.classList.add('hidden');
+      const subtitle = document.getElementById('authSubtitle');
+      if (subtitle) subtitle.textContent = 'Google account से सुरक्षित Login करें';
+      document.getElementById('playerAuthModal')?.classList.remove('hidden');
+    }
+
+    function openProfileSetupModal(user) {
+      document.getElementById('authGoogleStep')?.classList.add('hidden');
+      document.getElementById('authProfileStep')?.classList.remove('hidden');
+      document.getElementById('authSubtitle').textContent = 'Profile पूरी करें (एक बार)';
+      document.getElementById('authGoogleDisplayName').textContent = user.displayName || 'Player';
+      document.getElementById('playerAuthModal')?.classList.remove('hidden');
+    }
+
+    async function saveNewPlayerProfile() {
+      const user = pendingAuthUser || auth.currentUser;
+      if (!user) return showToast("कृपया पहले लॉगिन करें।", "⚠️");
+      const game = document.getElementById('authGameSelect')?.value;
+      const gameId = document.getElementById('authGameId')?.value.trim();
+      const mobile = (document.getElementById('authMobile')?.value || '').replace(/\D/g, '');
+
+      if (!gameId) return showToast("कृपया Game ID दर्ज करें।", "⚠️");
+      if (!/^\d{10}$/.test(mobile)) return showToast("कृपया 10 अंकों का मान्य मोबाइल नंबर दर्ज करें।", "⚠️");
+
+      const btn = document.getElementById('saveProfileBtn');
+      if (btn) btn.disabled = true;
+
+      const profile = {
+        uid: user.uid,
+        email: user.email || '',
+        playerName: user.displayName || 'Player',
+        game,
+        gameId,
+        phone: mobile,
+        clutchArenaId: 'ATA' + Math.floor(10000000 + Math.random() * 90000000),
+        authProvider: 'google',
+        createdAt: new Date().toISOString(),
+        updatedAtMs: Date.now()
+      };
+
+      try {
+        await db.collection('users').doc(user.uid).set(profile, { merge: true });
+
+        // Record referral relationship if user registered via referral link
+        const refCode = sessionStorage.getItem('ata_ref_code');
+        if (refCode) {
+          try {
+            await db.collection('referrals').doc(user.uid).set({
+              referredUid: user.uid,
+              referrerUid: refCode,
+              createdAtMs: Date.now()
+            });
+            sessionStorage.removeItem('ata_ref_code');
+          } catch (rErr) {
+            console.warn("Referral tracking skipped:", rErr);
+          }
+        }
+
+        currentPlayer = profile;
+        updatePlayerUI();
+        setupUserRealtime(user.uid);
+        closePlayerAuthModal();
+        showToast(`स्वागत है! आपका ID: ${profile.clutchArenaId}`, "🎉");
+      } catch (e) {
+        console.error(e);
+        showToast("प्रोफाइल सेव नहीं हो सकी।", "❌");
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function logoutPlayer() {
+      if (auth) auth.signOut();
+      closePlayerDashboard();
+      showToast("लॉगआउट सफल!", "✓");
+    }
+
+    function updatePlayerUI() {
+      const btn = document.getElementById('playerLoginBtn');
+      if (btn) {
+        btn.textContent = currentPlayer ? `👤 ${currentPlayer.playerName.split(' ')[0]}` : '🔐 Login';
+      }
+      updateWalletUI();
+      renderTickets();
+    }
+
+    function updateWalletUI() {
+      const total = depositBalance + winningsBalance;
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      set('headerWalletAmount', `₹${total}`);
+      set('heroBalanceDisplay', `₹${total}`);
+      set('modalDepositBalance', `₹${depositBalance}`);
+      set('modalWinningsBalance', `₹${winningsBalance}`);
+      set('withdrawMaxDisplay', `₹${winningsBalance}`);
+      set('regWalletBalDisplay', `बैलेंस: ₹${total}`);
+      set('dashDeposit', `₹${depositBalance}`);
+      set('dashWinnings', `₹${winningsBalance}`);
+    }
+
+    // Tournament UI
+    function renderTournaments(filter = 'all') {
+      const container = document.getElementById('tournamentCardsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      const list = filter === 'all' ? tournaments : tournaments.filter(t => t.category === filter);
+      if (!list.length) {
+        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500 font-bold">अभी कोई टूर्नामेंट उपलब्ध नहीं है।</div>`;
+        return;
+      }
+
+      list.forEach(t => {
+        const percent = Math.min(100, Math.round(((t.filledSlots || 0) / (t.maxSlots || 48)) * 100));
+        const isClosed = t.status === 'CLOSED';
+        const isFull = (t.filledSlots || 0) >= (t.maxSlots || 48);
+
+        // Check if CURRENT LOGGED-IN PLAYER has joined this specific contest
+        const userPass = (currentPlayer && registeredPasses) ? registeredPasses.find(p => p.tournId === t.id) : null;
+        const hasJoined = Boolean(userPass);
+
+        // Custom Room ID & Password Security:
+        // A player must NOT be able to see the Custom Room ID or Password unless that player has successfully joined that specific contest.
+        // If a player has not joined a contest, completely hide/disable the Custom ID and Password section for that contest.
+        let credentialsHtml = '';
+        if (hasJoined) {
+          const cred = joinedCredentials[t.id];
+          const hasLiveCreds = cred && cred.roomId && cred.roomId.trim() !== '' && cred.roomId !== 'पेंडिंग';
+          const rId = hasLiveCreds ? cred.roomId : (userPass.roomId && userPass.roomId !== 'पेंडिंग' && userPass.roomId !== 'सिक्योर' ? userPass.roomId : 'मैच से 10 मिनट पहले लाइव होगा');
+          const rPass = hasLiveCreds ? cred.roomPass : (userPass.roomPass && userPass.roomPass !== 'पेंडिंग' && userPass.roomPass !== 'सिक्योर' ? userPass.roomPass : 'मैच से 10 मिनट पहले लाइव होगा');
+
+          credentialsHtml = `
+            <div class="mt-3 p-3 rounded-xl bg-slate-900/95 border border-emerald-500/40 shadow-inner">
+              <div class="flex items-center justify-between text-[11px] font-bold text-emerald-400 mb-1.5 pb-1 border-b border-white/5">
+                <span class="flex items-center gap-1.5">🔒 आपका सिक्योर स्लॉट पास</span>
+                <span class="font-rajdhani font-black text-xs text-brand-gold bg-black/40 px-2 py-0.5 rounded">${userPass.slotNumber || 'स्लॉट कन्फर्म'}</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-black/50 p-2 rounded-lg border border-white/5">
+                  <span class="text-[10px] text-slate-400 block font-medium">Custom Room ID:</span>
+                  <div class="flex items-center justify-between mt-0.5">
+                    <span class="font-mono font-bold text-brand-gold text-sm select-all tracking-wider">${rId}</span>
+                    ${hasLiveCreds ? `<button onclick="copyText('${rId}', 'Room ID')" class="text-[10px] text-brand-cyan hover:underline ml-1">कॉपी</button>` : ''}
+                  </div>
+                </div>
+                <div class="bg-black/50 p-2 rounded-lg border border-white/5">
+                  <span class="text-[10px] text-slate-400 block font-medium">Custom Password:</span>
+                  <div class="flex items-center justify-between mt-0.5">
+                    <span class="font-mono font-bold text-white text-sm select-all tracking-wider">${rPass}</span>
+                    ${hasLiveCreds ? `<button onclick="copyText('${rPass}', 'Password')" class="text-[10px] text-brand-cyan hover:underline ml-1">कॉपी</button>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="text-[9px] text-slate-400 mt-1.5 flex items-center justify-between">
+                <span>🛡️ केवल आपके लिए अधिकृत</span>
+                <a href="#my-tickets" class="text-brand-cyan hover:underline font-semibold">स्लॉट पास देखें →</a>
+              </div>
+            </div>
+          `;
+        }
+
+        const card = document.createElement('div');
+        card.className = "bg-brand-card rounded-2xl border " + (hasJoined ? "border-emerald-500/50" : "border-brand-border") + " p-5 shadow-lg flex flex-col justify-between";
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">${t.gameName}</span>
+              <div class="flex items-center gap-1.5">
+                ${hasJoined ? `<span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">✓ आप जॉइन्ड हैं</span>` : ''}
+                <span class="text-xs text-slate-400">${t.time}</span>
+              </div>
+            </div>
+            <h3 class="font-rajdhani font-black text-xl text-white mb-2 leading-tight">${t.title}</h3>
+            <div class="grid grid-cols-2 gap-2 text-xs text-slate-300 py-2.5 my-2 border-y border-brand-border">
+              <div>मैप: <strong class="text-white">${t.map}</strong></div>
+              <div>मोड: <strong class="text-white">${t.mode}</strong></div>
+              <div>पर किल: <strong class="text-emerald-400 font-bold">${t.perKill ? '₹' + t.perKill : '—'}</strong></div>
+              <div>प्राइज पूल: <strong class="text-brand-gold font-bold">₹${t.prizePool}</strong></div>
+            </div>
+            <div class="my-3">
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span class="text-slate-400">जुड़े खिलाड़ी</span>
+                <span class="text-white font-bold">${t.filledSlots || 0} / ${t.maxSlots || 48}</span>
+              </div>
+              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full gold-gradient rounded-full" style="width: ${percent}%;"></div>
+              </div>
+            </div>
+            ${credentialsHtml}
+          </div>
+          <div class="pt-3 flex items-center justify-between gap-3">
+            <div>
+              <span class="text-[10px] text-slate-400 font-bold block">एंट्री फीस</span>
+              <div class="font-rajdhani font-black text-2xl text-brand-gold">₹${t.entryFee}</div>
+            </div>
+            ${hasJoined ? `
+              <a href="#my-tickets" class="flex-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-rajdhani font-bold text-sm py-2.5 px-3 rounded-xl uppercase tracking-wider hover:bg-emerald-500/30 transition-all flex items-center justify-center gap-1.5 text-center">
+                <span>🎟️</span> <span>स्लॉट पास देखें</span>
+              </a>
+            ` : `
+              <button onclick="openJoinModal('${t.id}')" ${isClosed || isFull ? 'disabled' : ''} class="flex-1 ${isClosed || isFull ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'gold-gradient text-black active:scale-95'} font-rajdhani font-black text-sm py-2.5 px-3 rounded-xl uppercase tracking-wider">
+                ${isClosed ? '⛔ ENTRIES CLOSED' : (isFull ? '🔒 SLOTS FULL' : '⚡ 1-क्लिक जॉइन')}
+              </button>
+            `}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+      renderFeaturedMatch();
+    }
+
+    function renderFeaturedMatch() {
+      const live = tournaments.find(t => t.status !== 'CLOSED' && (t.filledSlots || 0) < (t.maxSlots || 48));
+      if (!live) return;
+      featuredTournamentId = live.id;
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      set('featuredGame', live.gameName);
+      set('featuredTitle', live.title);
+      set('featuredTime', `${live.time} • ${live.map}`);
+      set('featuredFee', `₹${live.entryFee}`);
+      set('featuredPrize', `₹${live.prizePool}`);
+      set('featuredBooyah', `₹${live.firstPrize || Math.round(live.prizePool * 0.55)}`);
+      set('featuredSlots', `${live.filledSlots || 0} / ${live.maxSlots || 48}`);
+    }
+
+    function openFeaturedJoin() {
+      if (featuredTournamentId) openJoinModal(featuredTournamentId);
+    }
+
+    function filterTournaments(cat) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.className = "tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase bg-brand-card text-slate-300 border border-brand-border";
+      });
+      const b = document.getElementById(`tab-${cat}`);
+      if (b) b.className = "tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase bg-brand-gold text-black";
+      renderTournaments(cat);
+    }
+
+    // 1-Click Tournament Join
+    function openJoinModal(tournId) {
+      if (!currentPlayer) { openPlayerAuthModal(); return; }
+      currentTournForJoin = tournaments.find(t => t.id === tournId);
+      if (!currentTournForJoin) return showToast("टूर्नामेंट नहीं मिला", "⚠️");
+      document.getElementById('modalTournGame').textContent = currentTournForJoin.gameName;
+      document.getElementById('modalTournName').textContent = currentTournForJoin.title;
+      document.getElementById('modalTournTime').textContent = currentTournForJoin.time;
+      document.getElementById('modalTournFee').textContent = `₹${currentTournForJoin.entryFee}`;
+      document.getElementById('regGameUid').value = currentPlayer.gameId || '';
+      document.getElementById('regPlayerName').value = currentPlayer.playerName || '';
+      document.getElementById('joinModal')?.classList.remove('hidden');
+    }
+
+    function closeJoinModal() { document.getElementById('joinModal')?.classList.add('hidden'); }
+
+    async function confirmWalletJoin() {
+      if (!currentPlayer || !currentTournForJoin || !db) return;
+      const gameUid = document.getElementById('regGameUid')?.value.trim();
+      const pName = document.getElementById('regPlayerName')?.value.trim();
+      if (!gameUid || !pName) return showToast("कृपया सभी विवरण भरें।", "⚠️");
+
+      const fee = Number(currentTournForJoin.entryFee) || 0;
+      const totalBal = depositBalance + winningsBalance;
+      if (totalBal < fee) {
+        showToast("वॉलेट बैलेंस कम है! कृपया रिचार्ज करें।", "⚠️");
+        closeJoinModal();
+        openWalletModal('add');
+        return;
+      }
+
+      const btn = document.getElementById('joinSubmitBtn');
+      if (btn) btn.disabled = true;
+
+      const uid = currentPlayer.uid;
+      const tournId = currentTournForJoin.id;
+      const passDocId = `${tournId}__${uid}`;
+      const walletRef = db.collection('wallets').doc(uid);
+      const tournRef = db.collection('tournaments').doc(tournId);
+      const passRef = db.collection('registeredPasses').doc(passDocId);
+
+      try {
+        await db.runTransaction(async tx => {
+          const tSnap = await tx.get(tournRef);
+          const wSnap = await tx.get(walletRef);
+          const pSnap = await tx.get(passRef);
+
+          if (!tSnap.exists) throw new Error("टूर्नामेंट उपलब्ध नहीं है।");
+          if (pSnap.exists) throw new Error("आप इस मैच में पहले से रजिस्टर्ड हैं।");
+
+          const tData = tSnap.data();
+          if (tData.status === 'CLOSED') throw new Error("एंट्रीज बंद हो चुकी हैं।");
+          if ((tData.filledSlots || 0) >= (tData.maxSlots || 48)) throw new Error("स्लॉट भर चुके हैं।");
+
+          const wData = wSnap.exists ? wSnap.data() : { deposit: 0, winnings: 0 };
+          const curDep = Number(wData.deposit) || 0;
+          const curWin = Number(wData.winnings) || 0;
+          if ((curDep + curWin) < fee) throw new Error("अपर्याप्त बैलेंस।");
+
+          let nDep = curDep, nWin = curWin;
+          if (nDep >= fee) nDep -= fee;
+          else { nWin -= (fee - nDep); nDep = 0; }
+
+          const nextFilled = (tData.filledSlots || 0) + 1;
+          const slotNumber = `स्लॉट #${nextFilled}`;
+          const passId = `PASS-${Math.floor(100000 + Math.random() * 900000)}`;
+
+          tx.set(walletRef, { uid, deposit: nDep, winnings: nWin, updatedAtMs: Date.now() }, { merge: true });
+          tx.update(tournRef, { filledSlots: nextFilled, lastJoinUid: uid, lastJoinPassId: passDocId, updatedAtMs: Date.now() });
+          tx.set(passRef, {
+            passId, tournId, playerUid: uid, tournTitle: tData.title, gameName: tData.gameName,
+            playerName: pName, gameId: gameUid, slotNumber,
+            roomId: 'सिक्योर', roomPass: 'सिक्योर',
+            matchTime: tData.time, status: 'CONFIRMED', createdAtMs: Date.now()
+          });
+          tx.set(db.collection('walletPassbook').doc(`match-${tournId}-${uid}`), {
+            uid, type: 'debit', desc: `मैच एंट्री: ${tData.title}`, amount: fee, createdAtMs: Date.now(),
+            date: new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' })
+          });
+        });
+
+        closeJoinModal();
+        showToast("मुबारक! स्लॉट पास कन्फर्म हो गया।", "🎉");
+        document.getElementById('my-tickets')?.scrollIntoView({ behavior: 'smooth' });
+      } catch (e) {
+        showToast(e.message || "जॉइन करने में त्रुटि हुई।", "❌");
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Deposit Submission
+    async function submitWalletDeposit() {
+      if (!currentPlayer || !db) return showToast("पहले लॉगिन करें।", "⚠️");
+      const amt = Number(document.getElementById('customDepositInput')?.value);
+      const utr = document.getElementById('depositUtrInput')?.value.trim();
+      if (!amt || amt < 20) return showToast("न्यूनतम ₹20 का रिचार्ज करें।", "⚠️");
+      if (!/^\d{10,22}$/.test(utr)) return showToast("कृपया सही UTR नंबर (10–22 अंक) डालें।", "⚠️");
+
+      const btn = document.getElementById('depositSubmitBtn');
+      if (btn) btn.disabled = true;
+
+      const reqId = `DEP-${Date.now().toString(36).toUpperCase()}`;
+      try {
+        await db.collection('depositRequests').doc(reqId).set({
+          id: reqId, playerUid: currentPlayer.uid, player: currentPlayer.playerName,
+          phone: currentPlayer.phone, amount: amt, utr, status: 'PENDING',
+          createdAtMs: Date.now(), time: new Date().toLocaleString('hi-IN')
+        });
+        document.getElementById('depositUtrInput').value = '';
+        closeWalletModal();
+        showToast(`UTR सबमिट हुआ! वेरिफिकेशन के बाद ₹${amt} क्रेडिट होंगे।`, "⏳");
+      } catch (e) {
+        showToast("डिपॉजिट सबमिट नहीं हो सका।", "❌");
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Withdrawal Submission
+    async function submitWithdrawalRequest() {
+      if (!currentPlayer || !db) return showToast("पहले लॉगिन करें।", "⚠️");
+      const amt = Number(document.getElementById('withdrawAmountInput')?.value);
+      const upi = document.getElementById('withdrawUpiInput')?.value.trim();
+      if (!amt || amt < 50) return showToast("न्यूनतम विड्रॉल ₹50 है।", "⚠️");
+      if (!/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$/.test(upi)) return showToast("सही UPI ID डालें (उदा. 9876543210@paytm)", "⚠️");
+      if (winningsBalance < amt) return showToast("जीते हुए बैलेंस से ज्यादा नहीं निकाल सकते।", "⚠️");
+
+      const btn = document.getElementById('withdrawSubmitBtn');
+      if (btn) btn.disabled = true;
+
+      const reqId = `W-${Date.now().toString(36).toUpperCase()}`;
+      try {
+        await db.runTransaction(async tx => {
+          const wRef = db.collection('wallets').doc(currentPlayer.uid);
+          const wSnap = await tx.get(wRef);
+          const curWin = Number(wSnap.data()?.winnings) || 0;
+          if (curWin < amt) throw new Error("अपर्याप्त बैलेंस।");
+          tx.update(wRef, { winnings: curWin - amt, updatedAtMs: Date.now() });
+          tx.set(db.collection('withdrawalRequests').doc(reqId), {
+            id: reqId, playerUid: currentPlayer.uid, playerName: currentPlayer.playerName,
+            phone: currentPlayer.phone, upi, amount: amt, status: 'PENDING',
+            createdAtMs: Date.now(), time: new Date().toLocaleString('hi-IN')
+          });
+          tx.set(db.collection('walletPassbook').doc(`with-${reqId}`), {
+            uid: currentPlayer.uid, type: 'debit', desc: `UPI विड्रॉल: ${upi}`,
+            amount: amt, createdAtMs: Date.now(), date: 'प्रोसेसिंग ⏳'
+          });
+        });
+        closeWalletModal();
+        showToast("विड्रॉल रिक्वेस्ट सबमिट हो गई!", "🎉");
+      } catch (e) {
+        showToast(e.message || "विड्रॉल असफल रहा।", "❌");
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // UI Renders for Passes & Passbook
+    function renderTickets() {
+      const c = document.getElementById('ticketsList');
+      if (!c) return;
+      c.innerHTML = '';
+      if (!currentPlayer) {
+        c.innerHTML = `<div class="col-span-full bg-brand-card/50 border border-dashed border-brand-border rounded-xl p-8 text-center text-slate-400 text-xs">कृपया अपने स्लॉट पास और सिक्योर रूम आईडी देखने के लिए <button onclick="openPlayerEntry()" class="text-brand-gold font-bold underline ml-1">लॉगिन करें</button>।</div>`;
+        return;
+      }
+      if (!registeredPasses.length) {
+        c.innerHTML = `<div class="col-span-full bg-brand-card/50 border border-dashed border-brand-border rounded-xl p-8 text-center text-slate-400 text-xs">आपने अभी किसी टूर्नामेंट में स्लॉट बुक नहीं किया है। ऊपर किसी भी मैच में <strong>⚡ 1-क्लिक जॉइन</strong> करें!</div>`;
+        return;
+      }
+      registeredPasses.forEach(p => {
+        const cred = joinedCredentials[p.tournId];
+        const hasLiveCreds = cred && cred.roomId && cred.roomId.trim() !== '' && cred.roomId !== 'पेंडिंग';
+        const currentRoomId = hasLiveCreds ? cred.roomId : (p.roomId && p.roomId !== 'पेंडिंग' && p.roomId !== 'सिक्योर' ? p.roomId : 'मैच से 10 मिनट पहले लाइव होगा');
+        const currentRoomPass = hasLiveCreds ? cred.roomPass : (p.roomPass && p.roomPass !== 'पेंडिंग' && p.roomPass !== 'सिक्योर' ? p.roomPass : 'मैच से 10 मिनट पहले लाइव होगा');
+
+        const card = document.createElement('div');
+        card.className = "bg-brand-card rounded-2xl border border-brand-gold/40 p-5 shadow-xl relative overflow-hidden";
+        card.innerHTML = `
+          <div class="flex items-center justify-between pb-2.5 border-b border-brand-border">
+            <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">● कन्फर्म स्लॉट पास</span>
+            <span class="font-mono text-[10px] text-slate-400">${p.passId}</span>
+          </div>
+          <div class="my-3">
+            <span class="text-[11px] text-brand-gold font-bold uppercase tracking-wider">${p.gameName}</span>
+            <h4 class="font-rajdhani font-black text-xl text-white leading-tight">${p.tournTitle}</h4>
+            <div class="text-xs text-slate-400 mt-1.5 flex justify-between">
+              <span>लीडर / प्लेयर: <strong class="text-white">${p.playerName}</strong></span>
+              <span>समय: <strong class="text-white">${p.matchTime}</strong></span>
+            </div>
+          </div>
+          <div class="p-2.5 bg-brand-panel rounded-xl border border-brand-cyan/30 flex items-center justify-between mb-3">
+            <span class="text-xs font-bold text-slate-300">आपका अलॉटेड रूम स्लॉट:</span>
+            <span class="font-rajdhani font-black text-lg text-brand-cyan bg-black/40 px-3 py-0.5 rounded-lg border border-brand-cyan/20">${p.slotNumber}</span>
+          </div>
+          <div class="p-3 bg-slate-900/90 rounded-xl border border-slate-700/60 space-y-2">
+            <div class="flex items-center justify-between text-[11px] font-bold text-slate-400 border-b border-white/5 pb-1">
+              <span class="flex items-center gap-1">🔒 सिक्योर रूम क्रेडेंशियल्स</span>
+              <span class="text-[9px] text-emerald-400 font-mono">${hasLiveCreds ? '● क्रेडेंशियल्स लाइव' : '⏳ पेंडिंग'}</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Room ID:</span>
+              <div class="flex items-center gap-2">
+                <span class="font-mono font-bold ${hasLiveCreds ? 'text-brand-gold text-sm select-all' : 'text-slate-500'}">${currentRoomId}</span>
+                ${hasLiveCreds ? `<button onclick="copyText('${currentRoomId}', 'Room ID')" class="text-[10px] bg-brand-gold/20 text-brand-gold px-1.5 py-0.5 rounded border border-brand-gold/30 hover:bg-brand-gold/30">कॉपी</button>` : ''}
+              </div>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Password:</span>
+              <div class="flex items-center gap-2">
+                <span class="font-mono font-bold ${hasLiveCreds ? 'text-white text-sm select-all' : 'text-slate-500'}">${currentRoomPass}</span>
+                ${hasLiveCreds ? `<button onclick="copyText('${currentRoomPass}', 'Password')" class="text-[10px] bg-white/10 text-white px-1.5 py-0.5 rounded border border-white/20 hover:bg-white/20">कॉपी</button>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="text-[9px] text-slate-500 mt-2 text-center">
+            🛡️ यह क्रेडेंशियल केवल आपके UID (${p.playerUid ? p.playerUid.slice(0, 8) : ''}...) के लिए अधिकृत है।
+          </div>
+        `;
+        c.appendChild(card);
+      });
+    }
+
+    function renderPassbook() {
+      const c = document.getElementById('passbookContainer');
+      if (!c) return;
+      c.innerHTML = '';
+      if (!passbook.length) {
+        c.innerHTML = `<div class="text-center py-4 text-slate-500 text-xs">कोई लेन-देन नहीं है।</div>`;
+        return;
+      }
+      passbook.forEach(tx => {
+        const item = document.createElement('div');
+        item.className = "p-2.5 rounded-lg bg-brand-panel border border-brand-border flex items-center justify-between text-xs";
+        item.innerHTML = `
+          <div>
+            <div class="font-bold text-white">${tx.desc}</div>
+            <div class="text-[9px] text-slate-400">${tx.date || ''}</div>
+          </div>
+          <div class="font-rajdhani font-bold text-base ${tx.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}">
+            ${tx.type === 'credit' ? '+' : '-'} ₹${tx.amount}
+          </div>
+        `;
+        c.appendChild(item);
+      });
+    }
+
+    function renderLeaderboard() {
+      const tbody = document.getElementById('leaderboardTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      leaderboardData.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-rajdhani font-black text-base text-brand-gold">${r.rank}</td>
+          <td class="py-3 px-4 font-bold text-white">${r.name}</td>
+          <td class="py-3 px-4 text-xs text-slate-400">${r.match}</td>
+          <td class="py-3 px-4 font-rajdhani font-bold text-base text-emerald-400">${r.prize}</td>
+          <td class="py-3 px-4 text-right"><span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">${r.status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Wallet Tabs & Helpers
+    function openWalletModal(tab = 'add') {
+      if (!currentPlayer) return openPlayerAuthModal();
+      document.getElementById('walletModal')?.classList.remove('hidden');
+      switchWalletTab(tab);
+      updateWalletUI();
+    }
+    function closeWalletModal() { document.getElementById('walletModal')?.classList.add('hidden'); }
+    function switchWalletTab(tab) {
+      document.getElementById('walletTabDeposit')?.classList.toggle('hidden', tab !== 'add');
+      document.getElementById('walletTabWithdraw')?.classList.toggle('hidden', tab !== 'withdraw');
+      document.getElementById('walletTabHistory')?.classList.toggle('hidden', tab !== 'history');
+      document.getElementById('wtab-add').className = `flex-1 pb-2 text-xs font-bold border-b-2 ${tab === 'add' ? 'border-brand-gold text-brand-gold' : 'border-transparent text-slate-400'}`;
+      document.getElementById('wtab-withdraw').className = `flex-1 pb-2 text-xs font-bold border-b-2 ${tab === 'withdraw' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-slate-400'}`;
+      document.getElementById('wtab-history').className = `flex-1 pb-2 text-xs font-bold border-b-2 ${tab === 'history' ? 'border-brand-gold text-brand-gold' : 'border-transparent text-slate-400'}`;
+    }
+    function selectTopupAmount(amt) { document.getElementById('customDepositInput').value = amt; }
+    function copyUpiId() {
+      navigator.clipboard.writeText("paytm.s3qpmwg@pty").then(() => showToast("UPI ID कॉपी हो गई: paytm.s3qpmwg@pty", "📋"));
+    }
+    function openUpiPayment() {
+      const amt = document.getElementById('customDepositInput')?.value || '100';
+      window.location.href = `upi://pay?pa=paytm.s3qpmwg@pty&pn=AeroTriggerArena&am=${amt}&cu=INR`;
+    }
+
+    // Dashboard & Referral
+    function openPlayerEntry() {
+      if (currentPlayer) openPlayerDashboard();
+      else openPlayerAuthModal();
+    }
+    function openPlayerDashboard() {
+      if (!currentPlayer) return openPlayerAuthModal();
+      document.getElementById('dashPlayerName').textContent = currentPlayer.playerName;
+      document.getElementById('dashClutchId').textContent = currentPlayer.clutchArenaId || '—';
+      document.getElementById('dashGameId').textContent = currentPlayer.gameId || '—';
+      document.getElementById('dashPhone').textContent = '+91 ' + (currentPlayer.phone || '—');
+      document.getElementById('dashboardReferralCode').textContent = 'ATA' + currentPlayer.uid.slice(0,8).toUpperCase();
+      document.getElementById('dashJoinedCount').textContent = registeredPasses.length;
+
+      const tList = document.getElementById('dashTournamentList');
+      if (tList) {
+        if (!registeredPasses.length) {
+          tList.innerHTML = `<div class="p-3 text-center text-xs text-slate-400 bg-black/30 rounded-xl border border-white/5">आपने अभी कोई टूर्नामेंट जॉइन नहीं किया है।</div>`;
+        } else {
+          tList.innerHTML = registeredPasses.map(p => {
+            const cred = joinedCredentials[p.tournId];
+            const hasLiveCreds = cred && cred.roomId && cred.roomId.trim() !== '' && cred.roomId !== 'पेंडिंग';
+            return `
+              <div class="p-3 rounded-xl bg-black/40 border border-brand-border flex items-center justify-between gap-2">
+                <div>
+                  <div class="text-xs font-bold text-white leading-tight">${p.tournTitle}</div>
+                  <div class="text-[10px] text-brand-gold mt-0.5">${p.slotNumber} • ${p.matchTime}</div>
+                </div>
+                <div class="text-right shrink-0">
+                  <span class="text-[10px] px-2 py-0.5 rounded font-mono ${hasLiveCreds ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}">
+                    ${hasLiveCreds ? 'Room ID लाइव' : 'स्लॉट कन्फर्म'}
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      document.getElementById('playerDashboardModal')?.classList.remove('hidden');
+    }
+    function closePlayerDashboard() { document.getElementById('playerDashboardModal')?.classList.add('hidden'); }
+    function copyReferralCode() {
+      const c = document.getElementById('dashboardReferralCode')?.textContent;
+      if (c) navigator.clipboard.writeText(c).then(() => showToast("रेफरल कोड कॉपी हो गया!", "📋"));
+    }
+    function shareReferralLink() {
+      const c = document.getElementById('dashboardReferralCode')?.textContent;
+      const url = `${window.location.origin}?ref=${c}`;
+      if (navigator.share) navigator.share({ title: 'Aero Trigger Arena', url });
+      else navigator.clipboard.writeText(url).then(() => showToast("रेफरल लिंक कॉपी हो गया!", "📋"));
+    }
+
+    function toggleMobileNav() { document.getElementById('mobileNavMenu')?.classList.toggle('hidden'); }
+    function manualRefreshPasses() { showToast("पास रिफ्रेश हो गए!", "🔄"); }
+    function closePlayerAuthModal() { document.getElementById('playerAuthModal')?.classList.add('hidden'); }
+
+    // Hidden Admin Panel Logic
+    function handleLogoTap(e) {
+      if (e) e.stopPropagation();
+      logoTapCount++;
+      clearTimeout(logoTapTimer);
+      logoTapTimer = setTimeout(() => { logoTapCount = 0; }, 2500);
+      if (logoTapCount >= 10) {
+        logoTapCount = 0;
+        verifyAndOpenAdmin();
+      }
+    }
+
+    async function verifyAndOpenAdmin() {
+      const user = auth?.currentUser;
+      if (!user) {
+        openPlayerAuthModal();
+        return showToast("एडमिन के लिए पहले अधिकृत Google खाते से लॉगिन करें।", "🔐");
+      }
+      // Rule & server verification
+      const email = (user.email || '').toLowerCase().trim();
+      const isAdminEmail = email === 'shindhvaatul@gmail.com';
+      let hasAdminDoc = false;
+      try {
+        const snap = await db.collection('admins').doc(user.uid).get();
+        if (snap.exists && snap.data()?.active) hasAdminDoc = true;
+      } catch (_) {}
+
+      if (isAdminEmail || hasAdminDoc) {
+        document.getElementById('adminDeskModal')?.classList.remove('hidden');
+        setupAdminRealtime();
+        showToast("एडमिन कंसोल खुल गया!", "🔓");
+      } else {
+        showToast(`एडमिन अनुमति नहीं मिली: ${email}`, "⛔");
+      }
+    }
+
+    function closeAdminDesk() { document.getElementById('adminDeskModal')?.classList.add('hidden'); }
+
+    function setupAdminRealtime() {
+      if (!db) return;
+      // Realtime Deposits Queue
+      if (unsubs.deposits) unsubs.deposits();
+      unsubs.deposits = db.collection('depositRequests').orderBy('createdAtMs', 'desc').limit(50).onSnapshot(snap => {
+        pendingDeposits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderAdminDeposits();
+      });
+
+      // Realtime Withdrawals Queue
+      if (unsubs.withdrawals) unsubs.withdrawals();
+      unsubs.withdrawals = db.collection('withdrawalRequests').orderBy('createdAtMs', 'desc').limit(50).onSnapshot(snap => {
+        withdrawalQueue = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderAdminWithdrawals();
+      });
+
+      populatePrizeSlots();
+      renderAdminTournamentControl();
+    }
+
+    function renderAdminDeposits() {
+      const tb = document.getElementById('adminDepositVerifyTable');
+      if (!tb) return;
+      tb.innerHTML = '';
+      pendingDeposits.forEach((d, idx) => {
+        const isPending = d.status === 'PENDING';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono font-bold text-slate-400">${d.id}</td>
+          <td class="py-2.5 px-3 font-bold text-white">${d.player}</td>
+          <td class="py-2.5 px-3 font-bold text-brand-gold">₹${d.amount}</td>
+          <td class="py-2.5 px-3 font-mono text-brand-cyan font-bold">${d.utr}</td>
+          <td class="py-2.5 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${isPending ? 'bg-amber-500/10 text-amber-400' : (d.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400')}">${d.status}</span></td>
+          <td class="py-2.5 px-3 text-right">
+            ${isPending ? `<div class="flex gap-1 justify-end"><button onclick="adminApproveDeposit('${d.id}')" class="bg-emerald-500 text-black font-bold px-2 py-1 rounded">✓</button><button onclick="adminRejectDeposit('${d.id}')" class="bg-rose-500 text-white font-bold px-2 py-1 rounded">✕</button></div>` : '<span class="text-slate-500 text-[10px]">हो गया</span>'}
+          </td>
+        `;
+        tb.appendChild(tr);
+      });
+    }
+
+    async function adminApproveDeposit(id) {
+      const req = pendingDeposits.find(d => d.id === id);
+      if (!req || req.status !== 'PENDING') return;
+      try {
+        await db.runTransaction(async tx => {
+          const dRef = db.collection('depositRequests').doc(id);
+          const wRef = db.collection('wallets').doc(req.playerUid);
+          const wSnap = await tx.get(wRef);
+          const curDep = Number(wSnap.data()?.deposit) || 0;
+          tx.update(dRef, { status: 'APPROVED', approvedAtMs: Date.now() });
+          tx.set(wRef, { deposit: curDep + req.amount, updatedAtMs: Date.now() }, { merge: true });
+          tx.set(db.collection('walletPassbook').doc(`dep-${id}`), {
+            uid: req.playerUid, type: 'credit', desc: `डिपॉजिट स्वीकृत (UTR: ${req.utr})`,
+            amount: req.amount, createdAtMs: Date.now(), date: new Date().toLocaleTimeString('hi-IN')
+          });
+        });
+        showToast(`₹${req.amount} क्रेडिट हो गए!`, "✅");
+      } catch (e) {
+        showToast("स्वीकृति असफल!", "❌");
+      }
+    }
+
+    async function adminRejectDeposit(id) {
+      try {
+        await db.collection('depositRequests').doc(id).update({ status: 'REJECTED', rejectedAtMs: Date.now() });
+        showToast("डिपॉजिट रिजेक्ट किया गया।", "⚠️");
+      } catch (e) {
+        showToast("अस्वीकृति असफल!", "❌");
+      }
+    }
+
+    function renderAdminWithdrawals() {
+      const tb = document.getElementById('adminWithdrawTable');
+      if (!tb) return;
+      tb.innerHTML = '';
+      withdrawalQueue.forEach(w => {
+        const isPending = w.status === 'PENDING';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono font-bold text-slate-400">${w.id}</td>
+          <td class="py-2.5 px-3"><div class="font-mono text-brand-cyan font-bold">${w.upi}</div><div class="text-[9px] text-slate-500">${w.playerName}</div></td>
+          <td class="py-2.5 px-3 font-bold text-emerald-400">₹${w.amount}</td>
+          <td class="py-2.5 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${isPending ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}">${w.status}</span></td>
+          <td class="py-2.5 px-3 text-right">
+            ${isPending ? `<button onclick="adminMarkWithdrawalPaid('${w.id}')" class="bg-emerald-500 text-black font-bold px-2.5 py-1 rounded text-xs">पेमेंट कन्फर्म</button>` : '<span class="text-emerald-400 text-[10px]">✓ ट्रांसफर</span>'}
+          </td>
+        `;
+        tb.appendChild(tr);
+      });
+    }
+
+    async function adminMarkWithdrawalPaid(id) {
+      try {
+        await db.collection('withdrawalRequests').doc(id).update({ status: 'PAID', paidAtMs: Date.now() });
+        showToast("पेमेंट मार्क किया गया!", "✅");
+      } catch (e) {
+        showToast("त्रुटि हुई!", "❌");
+      }
+    }
+
+    async function createNewTournament() {
+      const cat = document.getElementById('newMatchCategory')?.value;
+      const title = document.getElementById('newMatchTitle')?.value.trim();
+      const map = document.getElementById('newMatchMap')?.value.trim();
+      const time = document.getElementById('newMatchTime')?.value.trim();
+      const fee = Number(document.getElementById('newMatchFee')?.value);
+      const prize = Number(document.getElementById('newMatchPrize')?.value);
+      const perKill = Number(document.getElementById('newMatchPerKill')?.value) || 0;
+      const maxSlots = Number(document.getElementById('newMatchMaxSlots')?.value) || 48;
+
+      if (!title || !map || !time) return showToast("कृपया सभी विवरण भरें।", "⚠️");
+      const id = `${cat}-${Date.now().toString(36).toUpperCase()}`;
+      const tourn = {
+        id, category: cat, gameName: cat === 'ff' ? 'Free Fire MAX' : 'BGMI',
+        title, map, mode: 'Squad', time, entryFee: fee, prizePool: prize, perKill,
+        maxSlots, filledSlots: 0, firstPrize: Math.round(prize * 0.55),
+        hasCredentials: false, status: 'OPEN', createdAtMs: Date.now()
+      };
+      try {
+        await db.collection('tournaments').doc(id).set(tourn);
+        showToast("टूर्नामेंट पब्लिश हो गया!", "🔥");
+      } catch (e) {
+        showToast("पब्लिश असफल!", "❌");
+      }
+    }
+
+    function updateAdminTournSelect() {
+      const sel = document.getElementById('adminBroadcastTournSelect');
+      if (!sel) return;
+      sel.innerHTML = `<option value="">-- मैच चुनें --</option>` + tournaments.map(t => `<option value="${t.id}">${t.title}</option>`).join('');
+      sel.onchange = (e) => handleAdminBroadcastTournSelect(e.target.value);
+    }
+
+    async function handleAdminBroadcastTournSelect(tId) {
+      if (!tId) return;
+      try {
+        const cSnap = await db.collection('tournamentCredentials').doc(tId).get();
+        if (cSnap.exists) {
+          const c = cSnap.data();
+          document.getElementById('adminBroadcastRoomId').value = c.roomId || '';
+          document.getElementById('adminBroadcastPass').value = c.roomPass || '';
+        } else {
+          document.getElementById('adminBroadcastRoomId').value = '';
+          document.getElementById('adminBroadcastPass').value = '';
+        }
+      } catch (e) {
+        console.warn("Credentials load warning:", e);
+      }
+    }
+
+    async function selectTournForCredentialsEdit(tournId) {
+      const sel = document.getElementById('adminBroadcastTournSelect');
+      if (sel) {
+        sel.value = tournId;
+        await handleAdminBroadcastTournSelect(tournId);
+      }
+      document.getElementById('adminBroadcastRoomId')?.focus();
+      document.getElementById('adminBroadcastRoomId')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showToast("मैच क्रेडेंशियल एडिटर में लोड हो गया!", "🎯");
+    }
+
+    // Admin Room ID Broadcaster with Firestore Security Enforcement
+    async function broadcastCredentials() {
+      const sel = document.getElementById('adminBroadcastTournSelect');
+      const rId = document.getElementById('adminBroadcastRoomId')?.value.trim();
+      const rPass = document.getElementById('adminBroadcastPass')?.value.trim();
+      const tournId = sel?.value;
+      if (!tournId || !rId || !rPass) return showToast("कृपया मैच चुनें और दोनों Room ID व Password दर्ज करें।", "⚠️");
+
+      try {
+        const batch = db.batch();
+        // 1. Save strictly to the protected tournamentCredentials collection (Firestore rule restricts read to admin and joined players only)
+        batch.set(db.collection('tournamentCredentials').doc(tournId), {
+          tournId,
+          roomId: rId,
+          roomPass: rPass,
+          updatedAtMs: Date.now(),
+          updatedBy: auth.currentUser?.email || 'admin'
+        }, { merge: true });
+
+        // 2. Mark public tournament metadata as having credentials ready WITHOUT leaking the credentials in the public document
+        batch.update(db.collection('tournaments').doc(tournId), {
+          hasCredentials: true,
+          credentialsUpdatedAtMs: Date.now(),
+          updatedAtMs: Date.now()
+        });
+
+        // 3. Update all joined player passes for this specific tournament
+        const passesSnap = await db.collection('registeredPasses').where('tournId', '==', tournId).get();
+        passesSnap.docs.forEach(d => batch.update(d.ref, { roomId: rId, roomPass: rPass, updatedAtMs: Date.now() }));
+
+        await batch.commit();
+        showToast("Room ID & Password सुरक्षित रूप से ब्रॉडकास्ट हो गया!", "📡");
+        if (typeof renderAdminTournamentControl === 'function') renderAdminTournamentControl();
+      } catch (e) {
+        console.error("Broadcast error:", e);
+        showToast("ब्रॉडकास्ट असफल! " + (e.message || ''), "❌");
+      }
+    }
+
+    function renderAdminTournamentControl() {
+      const c = document.getElementById('adminTournamentControlList');
+      if (!c) return;
+      c.innerHTML = tournaments.map(t => {
+        const hasCreds = t.hasCredentials || (joinedCredentials[t.id] && joinedCredentials[t.id].roomId);
+        return `
+          <div class="rounded-xl border border-brand-border bg-slate-950/60 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div>
+              <div class="font-bold text-white flex items-center gap-2">
+                <span>${t.title}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded font-mono ${hasCreds ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-slate-800 text-slate-400'}">
+                  ${hasCreds ? '📡 क्रेडेंशियल्स लाइव' : '⏳ क्रेडेंशियल्स पेंडिंग'}
+                </span>
+              </div>
+              <div class="text-[10px] text-slate-400 mt-0.5">स्लॉट: ${t.filledSlots || 0}/${t.maxSlots || 48} • मैप: ${t.map} • फीस: ₹${t.entryFee} • स्टेटस: <strong class="${t.status === 'CLOSED' ? 'text-rose-400' : 'text-emerald-400'}">${t.status}</strong></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="selectTournForCredentialsEdit('${t.id}')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan hover:bg-brand-cyan/30 active:scale-95">
+                🔑 क्रेडेंशियल एडिट
+              </button>
+              <button onclick="toggleTournStatus('${t.id}', '${t.status}')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold ${t.status === 'CLOSED' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white'} active:scale-95">
+                ${t.status === 'CLOSED' ? 'Open' : 'Close'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function toggleTournStatus(id, current) {
+      const next = current === 'CLOSED' ? 'OPEN' : 'CLOSED';
+      try {
+        await db.collection('tournaments').doc(id).update({ status: next, updatedAtMs: Date.now() });
+        showToast(`स्टेटस ${next} कर दिया गया।`, "✓");
+      } catch (e) {
+        showToast("स्टेटस अपडेट असफल!", "❌");
+      }
+    }
+
+    async function populatePrizeSlots() {
+      const s1 = document.getElementById('distributeRank1Slot');
+      const s2 = document.getElementById('distributeRank2Slot');
+      const s3 = document.getElementById('distributeRank3Slot');
+      if (!s1) return;
+      try {
+        const snap = await db.collection('registeredPasses').orderBy('createdAtMs', 'desc').limit(40).get();
+        const opts = snap.docs.map(d => {
+          const p = d.data();
+          return `<option value="${p.playerUid}__${p.tournTitle}__${p.playerName}">${p.slotNumber} - ${p.playerName} (${p.tournTitle})</option>`;
+        }).join('');
+        s1.innerHTML = `<option value="">#1 Booyah विनर चुनें</option>` + opts;
+        s2.innerHTML = `<option value="">#2 विनर चुनें</option>` + opts;
+        s3.innerHTML = `<option value="">#3 विनर चुनें</option>` + opts;
+      } catch (_) {}
+    }
+
+    async function autoDistributeMatchPrizes() {
+      const v1 = document.getElementById('distributeRank1Slot')?.value;
+      const v2 = document.getElementById('distributeRank2Slot')?.value;
+      const v3 = document.getElementById('distributeRank3Slot')?.value;
+      if (!v1) return showToast("कृपया रैंक 1 विनर चुनें।", "⚠️");
+
+      const list = [
+        { raw: v1, rank: '👑 #1 Booyah', amt: 400 },
+        { raw: v2, rank: '🥈 #2 Runner-up', amt: 200 },
+        { raw: v3, rank: '🥉 #3 स्थान', amt: 100 }
+      ].filter(x => x.raw);
+
+      const btn = document.getElementById('autoDistributeBtn');
+      if (btn) btn.disabled = true;
+
+      try {
+        for (const item of list) {
+          const [uid, title, name] = item.raw.split('__');
+          const prizeDocId = `prize-${Date.now()}-${uid}`;
+          await db.runTransaction(async tx => {
+            const wRef = db.collection('wallets').doc(uid);
+            const wSnap = await tx.get(wRef);
+            const curWin = Number(wSnap.data()?.winnings) || 0;
+            tx.set(wRef, { winnings: curWin + item.amt, updatedAtMs: Date.now() }, { merge: true });
+            tx.set(db.collection('prizeLedger').doc(prizeDocId), {
+              playerUid: uid, playerName: name, tournTitle: title,
+              rank: item.rank, amount: item.amt, createdAtMs: Date.now()
+            });
+            tx.set(db.collection('walletPassbook').doc(`prz-${prizeDocId}`), {
+              uid, type: 'credit', desc: `प्राइज क्रेडिट: ${item.rank} (${title})`,
+              amount: item.amt, createdAtMs: Date.now(), date: new Date().toLocaleTimeString('hi-IN')
+            });
+          });
+        }
+        showToast("प्राइज वॉलेट में क्रेडिट हो गया!", "🚀");
+      } catch (e) {
+        showToast("प्राइज वितरण असफल!", "❌");
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Startup splash dismissal
+    function hideAeroTriggerSplash() {
+      const splash = document.getElementById('ataStartupSplash');
+      if (!splash) return;
+      splash.classList.add('ata-hide');
+      setTimeout(() => {
+        if (splash && splash.parentNode) {
+          splash.parentNode.removeChild(splash);
+        }
+      }, 300);
+    }
+
+    // Dismiss splash swiftly so user is never blocked by infinite spinner
+    setTimeout(hideAeroTriggerSplash, 400);
+
+    // Boot Orchestrator: renders initial content immediately and initializes Firebase
+    function bootAeroTriggerArena() {
+      hideAeroTriggerSplash();
+      seedInitialTournaments();
+
+      if (window.firebase && window.firebase.apps) {
+        initApp();
+      } else {
+        let attempts = 0;
+        const checkTimer = setInterval(() => {
+          attempts++;
+          if (window.firebase && window.firebase.apps) {
+            clearInterval(checkTimer);
+            initApp();
+          } else if (attempts >= 25) {
+            clearInterval(checkTimer);
+            console.warn("Firebase SDK deferred; app loaded with fallback.");
+            initApp();
+          }
+        }, 50);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bootAeroTriggerArena);
+    } else {
+      bootAeroTriggerArena();
+    }
+  </script>
+</body>
+</html>

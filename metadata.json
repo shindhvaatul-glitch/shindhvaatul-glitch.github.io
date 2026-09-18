@@ -1,0 +1,6 @@
+{
+  "name": "Aero Trigger Arena",
+  "description": "Production esports tournament and wallet platform with Google Authentication, real-time Firestore synchronization, and tournament management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

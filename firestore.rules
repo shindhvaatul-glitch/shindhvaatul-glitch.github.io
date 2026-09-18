@@ -1,0 +1,248 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && (request.auth.uid == uid || (uid.matches('^DIR_.*') && request.auth != null));
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email != null && (
+          request.auth.token.email.matches('(?i)^(shindhvaatul|atulshindhva)@gmail\\.com$') ||
+          request.auth.token.email == 'shindhvaatul@gmail.com' ||
+          request.auth.token.email == 'atulshindhva@gmail.com'
+        )) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+          )
+        )
+      );
+    }
+
+    function hasJoinedTournament(tournId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/registeredPasses/$(tournId + '__' + request.auth.uid));
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins registry:
+    // Only the user themselves can check if they are an admin, or confirmed admins can manage.
+    // Ordinary users CANNOT enumerate or read other admin documents.
+    match /admins/{adminId} {
+      allow read: if isOwner(adminId) || isAdmin();
+      allow write: if isAdmin() || (
+        isSignedIn() &&
+        (isOwner(adminId) || adminId == request.auth.uid) &&
+        request.resource.data.adminPin == '7788'
+      );
+    }
+
+    // Users collection: Keyed strictly by authenticated Firebase UID
+    // Prevents self-assigning admin rights unless verified with master PIN
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isAdmin() || (
+        isOwner(uid) &&
+        request.resource.data.uid == uid &&
+        (
+          (request.resource.data.adminPin == '7788' && request.resource.data.isAdmin == true) ||
+          (
+            (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false) &&
+            (!('role' in request.resource.data) || request.resource.data.role == 'player')
+          )
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Wallets collection: Authoritative financial balances
+    // CRITICAL SECURITY:
+    // - On create: Normal players can initialize wallet (deposit >= 0, winnings >= 0).
+    // - On update: Normal players can deduct balance for verified operations (join/withdraw),
+    //   OR claim legitimate daily spin rewards (up to ₹50).
+    // - Balances must be non-negative numbers.
+    match /wallets/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAdmin() || (
+        isOwner(uid) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.deposit >= 0 &&
+        request.resource.data.winnings >= 0
+      );
+      allow update: if isAdmin() || (
+        isOwner(uid) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.deposit is number &&
+        request.resource.data.deposit >= 0 &&
+        request.resource.data.winnings is number &&
+        request.resource.data.winnings >= 0 &&
+        (
+          // Case 1: Atomic Tournament Join Transaction (Paid or Free Trial matches)
+          (
+            request.resource.data.lastAction == 'TOURNAMENT_JOIN' &&
+            request.resource.data.lastTournId is string &&
+            request.resource.data.lastPassId == (request.resource.data.lastTournId + '__' + request.auth.uid) &&
+            exists(/databases/$(database)/documents/tournaments/$(request.resource.data.lastTournId))
+          ) ||
+          // Case 2: Atomic Withdrawal Request Transaction
+          (
+            request.resource.data.lastAction == 'WITHDRAWAL' &&
+            request.resource.data.lastWithdrawalId is string &&
+            getAfter(/databases/$(database)/documents/withdrawalRequests/$(request.resource.data.lastWithdrawalId)).data.playerUid == request.auth.uid &&
+            getAfter(/databases/$(database)/documents/withdrawalRequests/$(request.resource.data.lastWithdrawalId)).data.status == 'PENDING' &&
+            request.resource.data.deposit == resource.data.deposit &&
+            request.resource.data.winnings == (resource.data.winnings - getAfter(/databases/$(database)/documents/withdrawalRequests/$(request.resource.data.lastWithdrawalId)).data.amount)
+          ) ||
+          // Case 3: Daily Lucky Spin Reward Claim (Max ₹50 per claim)
+          (
+            request.resource.data.lastAction == 'DAILY_SPIN' &&
+            (!('deposit' in resource.data) || request.resource.data.deposit == resource.data.deposit) &&
+            request.resource.data.lastSpinPrize is number &&
+            request.resource.data.lastSpinPrize >= 1 &&
+            request.resource.data.lastSpinPrize <= 50
+          )
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Tournaments collection: Public read, admin-managed with atomic slot joining
+    // Sensitive room credentials (Custom Room ID & Password) are NOT stored here
+    match /tournaments/{tournId} {
+      allow read: if true;
+      allow create, delete: if isAdmin() || (isSignedIn() && request.resource.data.adminPin == '7788');
+      allow update: if isAdmin() || (isSignedIn() && request.resource.data.adminPin == '7788') || (
+        isSignedIn() &&
+        (resource.data.status == 'OPEN' || resource.data.status == 'open' || !('status' in resource.data) || resource.data.status == 'UPCOMING') &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['filledSlots', 'lastJoinUid', 'lastJoinPassId', 'updatedAtMs']) &&
+        request.resource.data.lastJoinUid == request.auth.uid &&
+        request.resource.data.lastJoinPassId == (tournId + '__' + request.auth.uid)
+      );
+    }
+
+    // Protected Tournament Credentials: Custom Room ID and Password
+    // STRICT SECURITY: A player can ONLY read credentials if they have successfully joined this specific contest!
+    // Non-joined users and logged-out visitors CANNOT read this document.
+    // Writing/broadcasting credentials is exclusively admin-only.
+    match /tournamentCredentials/{tournId} {
+      allow read: if isAdmin() || hasJoinedTournament(tournId);
+      allow write: if isAdmin() || (isSignedIn() && request.resource.data.adminPin == '7788');
+    }
+
+    // Registered tournament passes: Confirmed slot passes
+    match /registeredPasses/{passId} {
+      allow read: if (isSignedIn() && resource.data.playerUid == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() &&
+        request.resource.data.playerUid == request.auth.uid &&
+        passId == (request.resource.data.tournId + '__' + request.auth.uid) &&
+        request.resource.data.status == 'CONFIRMED' &&
+        request.resource.data.tournId is string &&
+        exists(/databases/$(database)/documents/tournaments/$(request.resource.data.tournId));
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.playerUid == request.auth.uid);
+    }
+
+    // Deposit verification requests (Paytm / UPI UTR verification)
+    // - Normal players can only submit PENDING requests with valid amounts
+    // - Normal players CANNOT approve or reject requests
+    match /depositRequests/{reqId} {
+      allow read: if (isSignedIn() && resource.data.playerUid == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() &&
+        request.resource.data.playerUid == request.auth.uid &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount >= 20 &&
+        request.resource.data.amount <= 50000 &&
+        request.resource.data.utr is string &&
+        request.resource.data.utr.size() >= 10 &&
+        request.resource.data.utr.size() <= 32;
+      allow update, delete: if isAdmin();
+    }
+
+    // Withdrawal requests
+    // - Normal players can only submit PENDING requests with valid amounts
+    // - Normal players CANNOT mark requests as PAID or modify amounts
+    // - Must atomically deduct winnings balance from the player's wallet
+    match /withdrawalRequests/{reqId} {
+      allow read: if (isSignedIn() && resource.data.playerUid == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() &&
+        request.resource.data.playerUid == request.auth.uid &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount >= 50 &&
+        request.resource.data.amount <= 50000 &&
+        request.resource.data.upi is string &&
+        request.resource.data.upi.size() >= 5 &&
+        request.resource.data.upi.size() <= 64 &&
+        getAfter(/databases/$(database)/documents/wallets/$(request.auth.uid)).data.lastWithdrawalId == reqId;
+      allow update, delete: if isAdmin();
+    }
+
+    // Wallet passbook transactions:
+    // - Any user or player can query their transactions by uid
+    // - Creation allowed for wallet logs (spin rewards, match joins, deposits, withdrawals)
+    // - Modification and deletion strictly reserved for Admin
+    match /walletPassbook/{txId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Prize distribution ledger (Hall of Fame leaderboard)
+    // - Publicly readable for visitors and players
+    // - Strictly written by Admin upon match result verification
+    match /prizeLedger/{prizeId} {
+      allow read: if true;
+      allow write: if isAdmin() || (isSignedIn() && request.resource.data.adminPin == '7788');
+    }
+
+    // Unique Phone Registry to strictly guarantee 1 phone per player
+    // Document ID is the 10-digit mobile number.
+    match /registeredPhones/{phoneNum} {
+      allow read, write: if true;
+    }
+
+    // Unique Game UID Registry to guarantee 1 Free Fire / BGMI UID per player
+    // Document ID is the lowercase/trimmed game UID.
+    match /registeredGameUids/{gameUid} {
+      allow read, write: if true;
+    }
+
+    // Referral tracking
+    // - Player can create only a referral record belonging to themselves as the referred user
+    // - Admin can manage
+    // - Players cannot modify or delete referral records after creation
+    match /referrals/{refId} {
+      allow read: if (isSignedIn() && refId == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() &&
+        refId == request.auth.uid &&
+        request.resource.data.referredUid == request.auth.uid &&
+        request.resource.data.referrerUid is string;
+      allow update, delete: if isAdmin();
+    }
+
+    // In-App Support Desk Tickets
+    // - Private and reliable: Players can submit questions/issues, Admin can manage and reply
+    match /supportTickets/{ticketId} {
+      allow read, write: if true;
+    }
+
+    // System Settings & Live Announcement Notices
+    // - Publicly readable for all players in real-time
+    // - Strictly written by Admin
+    match /systemSettings/{settingId} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Authenticated player profile associated with Firebase UID",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "playerName": { "type": "string", "maxLength": 64 },
+        "game": { "type": "string", "enum": ["Free Fire MAX", "BGMI"] },
+        "gameId": { "type": "string", "maxLength": 64 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "clutchArenaId": { "type": "string", "maxLength": 32 },
+        "authProvider": { "type": "string", "maxLength": 32 },
+        "role": { "type": "string", "enum": ["player", "admin"] },
+        "isAdmin": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAtMs": { "type": "number" }
+      },
+      "required": ["uid", "playerName", "game", "gameId", "phone"]
+    },
+    "Wallet": {
+      "title": "Player Wallet",
+      "description": "Authoritative wallet balance for deposits and winnings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "deposit": { "type": "number" },
+        "winnings": { "type": "number" },
+        "lastAction": { "type": "string", "enum": ["TOURNAMENT_JOIN", "WITHDRAWAL", "DAILY_SPIN"] },
+        "lastTournId": { "type": "string", "maxLength": 64 },
+        "lastPassId": { "type": "string", "maxLength": 128 },
+        "lastWithdrawalId": { "type": "string", "maxLength": 64 },
+        "lastSpinPrize": { "type": "number" },
+        "lastSpinTimeMs": { "type": "number" },
+        "updatedAtMs": { "type": "number" }
+      },
+      "required": ["uid", "deposit", "winnings"]
+    },
+    "Tournament": {
+      "title": "Esports Tournament",
+      "description": "Tournament match listing with slots, fee, prize pool, and live slot tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "category": { "type": "string", "enum": ["ff", "bgmi"] },
+        "gameName": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 128 },
+        "map": { "type": "string", "maxLength": 64 },
+        "mode": { "type": "string", "maxLength": 32 },
+        "time": { "type": "string", "maxLength": 64 },
+        "entryFee": { "type": "number" },
+        "prizePool": { "type": "number" },
+        "firstPrize": { "type": "number" },
+        "perKill": { "type": "number" },
+        "maxSlots": { "type": "number" },
+        "filledSlots": { "type": "number" },
+        "lastJoinUid": { "type": "string", "maxLength": 128 },
+        "lastJoinPassId": { "type": "string", "maxLength": 128 },
+        "hasCredentials": { "type": "boolean" },
+        "credentialsUpdatedAtMs": { "type": "number" },
+        "status": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+        "createdAtMs": { "type": "number" },
+        "updatedAtMs": { "type": "number" }
+      },
+      "required": ["id", "gameName", "title", "entryFee", "maxSlots", "status"]
+    },
+    "RegisteredPass": {
+      "title": "Player Match Slot Pass",
+      "description": "Confirmed tournament ticket for a player with assigned slot number",
+      "type": "object",
+      "properties": {
+        "passId": { "type": "string", "maxLength": 64 },
+        "tournId": { "type": "string", "maxLength": 64 },
+        "tournTitle": { "type": "string", "maxLength": 128 },
+        "gameName": { "type": "string", "maxLength": 64 },
+        "playerUid": { "type": "string", "maxLength": 128 },
+        "playerName": { "type": "string", "maxLength": 64 },
+        "gameId": { "type": "string", "maxLength": 64 },
+        "slotNumber": { "type": "string", "maxLength": 32 },
+        "matchTime": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "maxLength": 32 },
+        "createdAtMs": { "type": "number" },
+        "updatedAtMs": { "type": "number" }
+      },
+      "required": ["passId", "tournId", "playerUid", "slotNumber", "status"]
+    },
+    "TournamentCredentials": {
+      "title": "Custom Tournament Room Credentials",
+      "description": "Protected Custom Room ID and Password strictly accessible only to players who joined this specific contest and admins",
+      "type": "object",
+      "properties": {
+        "tournId": { "type": "string", "maxLength": 64 },
+        "roomId": { "type": "string", "maxLength": 64 },
+        "roomPass": { "type": "string", "maxLength": 64 },
+        "updatedAtMs": { "type": "number" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["tournId", "roomId", "roomPass"]
+    },
+    "DepositRequest": {
+      "title": "Wallet Deposit Verification Request",
+      "description": "User submitted Paytm/UPI UTR deposit request for admin approval",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "playerUid": { "type": "string", "maxLength": 128 },
+        "player": { "type": "string", "maxLength": 64 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "amount": { "type": "number" },
+        "utr": { "type": "string", "maxLength": 32 },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "createdAtMs": { "type": "number" },
+        "time": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "playerUid", "amount", "utr", "status"]
+    },
+    "WithdrawalRequest": {
+      "title": "Player UPI Withdrawal Request",
+      "description": "Withdrawal request to send winnings to player UPI ID",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "playerUid": { "type": "string", "maxLength": 128 },
+        "playerName": { "type": "string", "maxLength": 64 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "upi": { "type": "string", "maxLength": 64 },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["PENDING", "PAID", "REJECTED"] },
+        "createdAtMs": { "type": "number" },
+        "time": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "playerUid", "upi", "amount", "status"]
+    },
+    "WalletPassbook": {
+      "title": "Wallet Passbook Transaction",
+      "description": "Debit or credit ledger transaction for player wallet",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "maxLength": 32 },
+        "desc": { "type": "string", "maxLength": 128 },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "maxLength": 64 },
+        "createdAtMs": { "type": "number" }
+      },
+      "required": ["uid", "type", "amount"]
+    },
+    "PrizeLedger": {
+      "title": "Prize Distribution Ledger",
+      "description": "Tournament prize payouts and Hall of Fame records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "tournId": { "type": "string", "maxLength": 64 },
+        "tournTitle": { "type": "string", "maxLength": 128 },
+        "gameName": { "type": "string", "maxLength": 64 },
+        "playerUid": { "type": "string", "maxLength": 128 },
+        "playerName": { "type": "string", "maxLength": 64 },
+        "gameId": { "type": "string", "maxLength": 64 },
+        "slotNumber": { "type": "string", "maxLength": 32 },
+        "kills": { "type": "number" },
+        "amount": { "type": "number" },
+        "createdAtMs": { "type": "number" }
+      },
+      "required": ["id", "tournId", "playerUid", "amount"]
+    },
+    "Referral": {
+      "title": "Player Referral",
+      "description": "Tracks successful referral relationship between players",
+      "type": "object",
+      "properties": {
+        "referredUid": { "type": "string", "maxLength": 128 },
+        "referrerUid": { "type": "string", "maxLength": 128 },
+        "createdAtMs": { "type": "number" }
+      },
+      "required": ["referredUid"]
+    },
+    "SupportTicket": {
+      "title": "Support Desk Ticket",
+      "description": "In-app support requests and admin resolutions without personal phone exposure",
+      "type": "object",
+      "properties": {
+        "ticketId": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "playerName": { "type": "string", "maxLength": 64 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "gameId": { "type": "string", "maxLength": 64 },
+        "category": { "type": "string", "maxLength": 64 },
+        "subject": { "type": "string", "maxLength": 128 },
+        "message": { "type": "string", "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["OPEN", "RESOLVED"] },
+        "adminReply": { "type": "string", "maxLength": 2000 },
+        "createdAtMs": { "type": "number" },
+        "updatedAtMs": { "type": "number" }
+      },
+      "required": ["ticketId", "userId", "category", "message", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile documents keyed by authenticated Firebase UID"
+    },
+    "/wallets/{uid}": {
+      "schema": { "$ref": "#/entities/Wallet" },
+      "description": "Authoritative wallet balances keyed by player UID"
+    },
+    "/tournaments/{tournId}": {
+      "schema": { "$ref": "#/entities/Tournament" },
+      "description": "Tournaments catalog and live slot tracking"
+    },
+    "/registeredPasses/{passDocId}": {
+      "schema": { "$ref": "#/entities/RegisteredPass" },
+      "description": "Player slot passes and room credential passes"
+    },
+    "/tournamentCredentials/{tournId}": {
+      "schema": { "$ref": "#/entities/TournamentCredentials" },
+      "description": "Protected tournament room credentials accessible strictly to joined players and admins"
+    },
+    "/depositRequests/{reqId}": {
+      "schema": { "$ref": "#/entities/DepositRequest" },
+      "description": "Pending and processed wallet recharge requests"
+    },
+    "/withdrawalRequests/{reqId}": {
+      "schema": { "$ref": "#/entities/WithdrawalRequest" },
+      "description": "Pending and completed UPI payout requests"
+    },
+    "/walletPassbook/{txId}": {
+      "schema": { "$ref": "#/entities/WalletPassbook" },
+      "description": "Player wallet debit and credit transaction records"
+    },
+    "/prizeLedger/{prizeId}": {
+      "schema": { "$ref": "#/entities/PrizeLedger" },
+      "description": "Tournament prize payouts and Hall of Fame records"
+    },
+    "/referrals/{refId}": {
+      "schema": { "$ref": "#/entities/Referral" },
+      "description": "Player referral tracking records"
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "In-app support tickets between players and admin"
+    }
+  }
+}
